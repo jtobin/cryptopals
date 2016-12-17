@@ -1,2 +1,7 @@
 rust_intro
 probs
+bin
+target
+*.swp
+*.o
+*.hi
