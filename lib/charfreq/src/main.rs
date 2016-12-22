@@ -2,7 +2,7 @@ extern crate rustc_serialize as serialize;
 
 use serialize::hex::FromHex;
 use std::collections::HashMap;
-use std::io::{self, Read};
+use std::env;
 use std::string::String;
 use std::vec::Vec;
 
@@ -18,12 +18,16 @@ fn tally(vec: Vec<u8>) -> HashMap<u8, u8> {
 }
 
 fn main() {
-    let mut buffer = String::new();
+    let args: Vec<String> = env::args().collect();
 
-    io::stdin().read_to_string(&mut buffer)
-        .expect("charfreq: bad input");
+    if args.len() != 2 {
+        println!("USAGE: ./charfreq HEX");
+        return ()
+    }
 
-    let decoded = match buffer.from_hex() {
+    let supplied_string = &args[1];
+
+    let decoded = match supplied_string.from_hex() {
         Err(err) => panic!("charfreq: {}", err),
         Ok(val)  => val,
     };
@@ -33,6 +37,7 @@ fn main() {
 
     let best: Vec<(u8, u8)> = results.into_iter().take(5).collect();
 
+    println!("original: {}", &supplied_string);
     println!("byte (frequency)");
     println!("----------------");
     for (val, count) in best { println!("{} ({})", val, count); }

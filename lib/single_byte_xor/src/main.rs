@@ -15,7 +15,10 @@ fn main() {
     }
 
     let supplied_string = &args[1];
-    let supplied_byte   = supplied_string.clone().into_bytes()[0];
+    let supplied_byte   = match supplied_string.parse::<u8>() {
+        Err(err) => panic!("single_byte_xor: failed parse, {}", err),
+        Ok(val)  => val,
+    };
 
     // deal with stdin
     let mut buffer = String::new();
@@ -36,6 +39,6 @@ fn main() {
     };
 
     println!("original: {}", &buffer);
-    println!("xored with: {} ({})", supplied_string, supplied_byte);
+    println!("xored with: {} ({})", supplied_string, supplied_byte as char);
     println!("decrypted: {}", decrypted);
 }
