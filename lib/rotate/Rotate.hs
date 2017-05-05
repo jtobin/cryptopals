@@ -25,7 +25,7 @@ main = do
        Nothing   -> hPutStrLn stderr "rotate: invalid keysize"
        Just size -> do
          bs <- B8.getContents
-         let flipped = B.transpose $ chunks size (B8.filter (/= '\n') bs)
+         let flipped = B.transpose $ chunks size bs
          mapM_ B8.putStrLn flipped
 
     _ -> putStrLn "USAGE: echo FOO | ./rotate KEYSIZE"

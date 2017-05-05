@@ -10,7 +10,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     if args.len() != 2 {
-        println!("USAGE: echo FOO | ./single_byte_xor BYTE");
+        println!("USAGE: echo HEX | ./single_byte_xor BYTE");
         return ()
     }
 
