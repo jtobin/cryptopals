@@ -28,7 +28,7 @@ This is illustrated for 1.1.
 
 #### 1.3
 
-    $ ./bin/charfreq $(cat data/s1/q3_input.txt)
+    $ ./bin/charfreq $(< data/s1/q3_input.txt)
     original: 1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736
     byte (frequency)
     ----------------
@@ -58,7 +58,7 @@ This is illustrated for 1.1.
 
 #### 1.5
 
-    $ echo -n $(cat data/s1/q5_input.txt) | ./bin/repeating_key_xor ICE | fold -w 74
+    $ echo -n $(< data/s1/q5_input.txt) | ./bin/repeating_key_xor ICE | fold -w 74
     original:
     Burning 'em, if you ain't quick and nimble I go crazy when I hear a cymbal
     xored with: ICE
