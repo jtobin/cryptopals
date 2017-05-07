@@ -7,13 +7,6 @@ in [Rust](https://www.rust-lang.org) and [Haskell](https://haskell-lang.org/).
 
 ## Problems
 
-To check some of these you can use the following general pattern:
-
-    $ SOLUTION = $(whatever)
-    $ diff <(echo $SOLUTION) /path/to/golden/output
-
-This is illustrated for 1.1.
-
 ### Set 1
 
 #### 1.1
@@ -39,6 +32,32 @@ ASCII-encoded output is fun:
 
     $ echo $SOLUTION | xxd -r -p
     the kid don't play
+
+**Background**:
+
+Fixed-xor just encrypts by XOR'ing every bit with some corresponding bit.
+Example:
+
+    echo -n 'FAB' | xxd -b && echo -n 'ICE' | xxd -b
+    00000000: 01000110 01000001 01000010                             FAB
+    00000000: 01001001 01000011 01000101                             ICE
+
+So XOR-ing 'FAB' with 'ICE' can be done manually:
+
+    0100 0110 0100 0001 0100 0010
+    0100 1001 0100 0011 0100 0101
+
+    0000 1111 0000 0010 0000 0111
+
+So in hex that's '0f0207':
+
+    $ echo 'obase=16; ibase=2; 000011110000001000000111' | bc
+    F0207
+
+You can play things back like so to confirm:
+
+    $ ./bin/fixed_xor '0f0207' $(echo -n ICE | xxd -p) | xxd -r -p
+    FAB
 
 #### 1.3
 
@@ -131,4 +150,15 @@ Shift by 32 for readability:
     $ xxd -r -p <<< "$INPUTHEX" | \
         ./bin/repeating_key_xor "Terminator X: Bring the noise" | \
         xxd -r -p | less
+
+#### 1.7
+
+I use openssl less than I code, heck the rules:
+
+    $ KEY=$(echo -n 'YELLOW SUBMARINE' | xxd -p)
+    $ openssl enc -aes-128-ecb \
+        -a -d -K $KEY -nosalt \
+        -in data/s1/q7_input.txt | head -2
+    I'm back and I'm ringin' the bell
+    A rockin' on the mike while the fly girls yell
 
