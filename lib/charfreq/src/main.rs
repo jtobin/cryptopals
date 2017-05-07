@@ -25,10 +25,11 @@ fn main() {
         return ()
     }
 
-    let supplied_string = &args[1];
+    let supplied_string     = &args[1];
+    let supplied_string_len = supplied_string.len();
 
     let decoded = match supplied_string.from_hex() {
-        Err(err) => panic!("charfreq: {}", err),
+        Err(err) => panic!("charfreq: {} ({})", err, supplied_string_len),
         Ok(val)  => val,
     };
 
@@ -40,6 +41,8 @@ fn main() {
     println!("original: {}", &supplied_string);
     println!("byte (frequency)");
     println!("----------------");
-    for (val, count) in best { println!("{} ({})", val, count); }
+    for (val, count) in best {
+        println!("{}: {} (freq: {})", val, val as char, count);
+    }
 }
 

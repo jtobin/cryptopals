@@ -69,5 +69,19 @@ This is illustrated for 1.1.
 
 #### 1.6
 
-    $ INPUT=$(cat data/s1/q6_input.txt | ./bin/b642hex)
+    $ INPUTB64=$(< data/s1/q6_input.txt)
+    $ INPUTHEX=$(echo $INPUTB64 | ./bin/b642hex)
+    $ echo $INPUTB64 | ./bin/score_keysizes 4 10
+    $ # top keysizes for average of 4+ groups are roughly 5, 29, 3
+    $ KEYSIZE=5
+    $ echo $INPUTHEX | ./bin/rotate $KEYSIZE | parallel -k ./bin/charfreq | less
+    $ KEYSIZE=29
+    $ echo $INPUTHEX | ./bin/rotate $KEYSIZE | parallel -k ./bin/charfreq | less
+    $ xxd -r -p <<< "$INPUTHEX" | \
+        ./bin/repeating_key_xor "tERMINATOR x  bRING THE NOISE" | \
+        xxd -r -p | less
+    $ # shift by 32 for readability
+    $ xxd -r -p <<< "$INPUTHEX" | \
+        ./bin/repeating_key_xor "Terminator X: Bring the noise" | \
+        xxd -r -p | less
 

@@ -5,6 +5,7 @@
 import Control.Error (readMay)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
+import qualified Data.ByteString.Base16 as B16
 import System.Environment
 import System.IO
 
@@ -24,8 +25,10 @@ main = do
     (narg:_) -> case readMay narg :: Maybe Int of
        Nothing   -> hPutStrLn stderr "rotate: invalid keysize"
        Just size -> do
-         bs <- B8.getContents
-         let flipped = B.transpose $ chunks size bs
-         mapM_ B8.putStrLn flipped
+         hex <- B.getContents
+         let (bs, _) = B16.decode hex
+             flipped = B.transpose (chunks size bs)
+             rehexed = fmap B16.encode flipped
+         mapM_ B8.putStrLn rehexed
 
-    _ -> putStrLn "USAGE: echo FOO | ./rotate KEYSIZE"
+    _ -> putStrLn "USAGE: echo HEX | ./rotate KEYSIZE"

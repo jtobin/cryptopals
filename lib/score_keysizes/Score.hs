@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 import Control.Error (readMay)
+import qualified Control.Foldl as L
 import Data.Bits
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
@@ -21,27 +22,40 @@ distance s0 s1
     hamming a b = popCount (xor a b)
     alg = (+) . uncurry hamming
 
+-- | Split a bytestring into chunks.
+chunks :: Int -> B.ByteString -> [B.ByteString]
+chunks size = loop mempty where
+  loop !acc bs
+    | B.null bs = reverse acc
+    | otherwise = case B.splitAt size bs of
+        (chunk, rest) -> loop (chunk : acc) rest
+
 -- | Score a keysize applied to a bytestring.
-score :: Fractional a => B.ByteString -> Int -> Maybe a
-score text size = do
-  let (chunk0, rest) = B.splitAt size text
-      chunk1         = B.take size rest
-  hamming <- distance chunk0 chunk1
-  return $ fromIntegral hamming / fromIntegral size
+score :: Fractional a => Int -> Int -> B.ByteString -> Maybe a
+score nchunks size text = do
+  let normalize x = fromIntegral x / fromIntegral size
+      cs          = chunks size text
+
+  hammings <- case take nchunks cs of
+    (initial:rest) -> sequence [distance initial chunk | chunk <- rest]
+    _              -> Nothing
+
+  let nhammings = fmap normalize hammings
+  return $ L.fold (L.sum / L.genericLength) nhammings
 
 -- | Score keysizes 2-40 over a given bytestring.
-scoreKeysizes :: B.ByteString -> PSQ.IntPSQ Double ()
-scoreKeysizes text = loop PSQ.empty 2 where
+scoreKeysizes :: Int -> B.ByteString -> PSQ.IntPSQ Double ()
+scoreKeysizes nchunks text = loop PSQ.empty 2 where
   plain = B64.decodeLenient text
   loop !acc size
     | size == 40 = acc
-    | otherwise = case score plain size of
+    | otherwise = case score nchunks size plain of
         Nothing   -> acc
         Just prio ->
           let nacc = PSQ.insert size prio () acc
           in  loop nacc (succ size)
 
--- | Return the best (smallest) n keys from a queue, by key..
+-- | Return the best (smallest) n keys from a queue, by key.
 best :: Ord p => Int -> PSQ.IntPSQ p v -> [(Int, p)]
 best = loop mempty where
   loop !acc idx queue
@@ -58,12 +72,16 @@ main = do
   args <- getArgs
 
   case args of
-    (narg:_) -> do
+    (nchunksarg:narg:_) -> do
       let n = case readMay narg :: Maybe Int of
                 Nothing  -> PSQ.size scored
                 Just val -> val
 
-          scored = scoreKeysizes bs
+          nchunks = case readMay nchunksarg :: Maybe Int of
+            Nothing  -> 2
+            Just val -> val
+
+          scored = scoreKeysizes nchunks bs
           top    = best n scored
 
           render (k, v) = show k ++ ": " ++ show v
@@ -71,4 +89,4 @@ main = do
       putStrLn "keysize: score"
       mapM_ (putStrLn . render) top
 
-    _ -> putStrLn "USAGE: echo BASE64 | ./score_keysizes NUM_RESULTS"
+    _ -> putStrLn "USAGE: echo BASE64 | ./score_keysizes NUM_CHUNKS NUM_RESULTS"
