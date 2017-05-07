@@ -153,7 +153,7 @@ Shift by 32 for readability:
 
 #### 1.7
 
-I use openssl less than I code, heck the rules:
+I like openssl, heck the rules:
 
     $ KEY=$(echo -n 'YELLOW SUBMARINE' | xxd -p)
     $ openssl enc -aes-128-ecb \
@@ -161,4 +161,19 @@ I use openssl less than I code, heck the rules:
         -in data/s1/q7_input.txt | head -2
     I'm back and I'm ringin' the bell
     A rockin' on the mike while the fly girls yell
+
+#### 1.8
+
+    $ cat data/s1/q8_input.txt | parallel \
+        'echo -n {} | ./bin/chunks 8 | printf "%.10s %u\n" {} \
+          $(datamash countunique 1)' | awk '{ if ($2 < 20) { print }; }'
+    d880619740 14
+
+So, the line starting with 'd880619740' - line 133.
+
+**Background**:
+
+ECB means electronic codebook, the simplest block cipher encryption mode.  One
+divides a message into 16-byte chunks and then encrypts each chunk separately.
+The same 16 bytes will thus encrypt to the same output.
 
