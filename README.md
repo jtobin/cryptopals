@@ -177,3 +177,13 @@ ECB means electronic codebook, the simplest block cipher encryption mode.  One
 divides a message into 16-byte chunks and then encrypts each chunk separately.
 The same 16 bytes will thus encrypt to the same output.
 
+### Set 2
+
+#### 2.1
+
+    $ echo -n 'YELLOW SUBMARINE' | ./bin/pkcs 20 | xxd
+    00000000: 5945 4c4c 4f57 2053 5542 4d41 5249 4e45  YELLOW SUBMARINE
+    00000010: 0404 0404 0a                             .....
+
+
+
