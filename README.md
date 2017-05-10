@@ -185,5 +185,15 @@ The same 16 bytes will thus encrypt to the same output.
     00000000: 5945 4c4c 4f57 2053 5542 4d41 5249 4e45  YELLOW SUBMARINE
     00000010: 0404 0404 0a                             .....
 
+#### 2.2
 
+    $ KEY=$(echo -n 'YELLOW SUBMARINE' | xxd -p)
+    $ openssl enc -aes-128-cbc \
+        -a -d -K $KEY -nosalt -iv 0 \
+        -in data/s2/q10_input.txt | head -2
+    I'm back and I'm ringin' the bell
+    A rockin' on the mike while the fly girls yell
+
+The problem description says NO OPENSSL, but I don't actually have much
+experience with openssl, so it's fun to check out.
 
