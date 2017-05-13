@@ -162,6 +162,14 @@ I like openssl, heck the rules:
     I'm back and I'm ringin' the bell
     A rockin' on the mike while the fly girls yell
 
+Alternatively:
+
+    $ cat data/s1/q7_input.txt | tr -d '\n' | ./bin/aes_ecb | head -2
+    'm back and I'm ringin' the bell
+    A rockin' on the mike while the fly girls yell
+
+NB. missing the initial 'I' there for some reason.
+
 #### 1.8
 
     $ cat data/s1/q8_input.txt | parallel \
