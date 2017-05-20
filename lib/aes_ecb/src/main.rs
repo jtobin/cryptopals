@@ -88,6 +88,9 @@ fn main() {
 
     let output = &result[0..decrypted_len];
 
-    println!("{}", String::from_utf8_lossy(output));
+    match mode {
+        Mode::Decrypt => println!("{}", String::from_utf8_lossy(output)),
+        Mode::Encrypt => println!("{}", base64::encode(output)),
+    };
 }
 
