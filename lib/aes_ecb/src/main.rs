@@ -7,12 +7,32 @@ use openssl::symm::{Cipher, Crypter, Mode};
 use std::io::{self, Read};
 use clap::{App, Arg};
 
+fn crypt(cipher: Cipher,
+         mode: Mode,
+         key: &[u8],
+         iv: Option<&[u8]>,
+         input : Vec<u8>) -> Vec<u8> {
+
+    let input_len   = input.len();
+
+    let mut crypter = new_crypter_unpadded(cipher, mode, key, iv);
+    let mut result  = vec![0u8; input_len + cipher.key_len()];
+
+    let decrypted_len = match crypter.update(&input, result.as_mut_slice()) {
+            Ok(val)  => val,
+            Err(err) => panic!("{}", err)
+    };
+
+    (&result[0..decrypted_len]).to_vec()
+}
+
 fn new_crypter_unpadded(
         cipher: Cipher,
         mode: Mode,
         key: &[u8],
         iv: Option<&[u8]>
         ) -> Crypter {
+
     let mut crypter = match Crypter::new(cipher, mode, key, iv) {
             Ok(val) => val,
             Err(err) => panic!("{}", err)
@@ -54,10 +74,6 @@ fn main() {
             Err(err) => panic!("{}", err)
     };
 
-    let decoded_len = decoded.len();
-
-    let cipher = Cipher::aes_128_ecb();
-
     let mode = match args.occurrences_of("mode") {
             0 => Mode::Decrypt,
             _ => Mode::Encrypt,
@@ -78,19 +94,13 @@ fn main() {
             None       => None,
     };
 
-    let mut crypter = new_crypter_unpadded(cipher, mode, key, iv);
-    let mut result  = vec![0u8; decoded_len + cipher.key_len()];
+    let cipher = Cipher::aes_128_ecb();
 
-    let decrypted_len = match crypter.update(&decoded, result.as_mut_slice()) {
-            Ok(val)  => val,
-            Err(err) => panic!("{}", err)
-    };
-
-    let output = &result[0..decrypted_len];
+    let output = crypt(cipher, mode, key, iv, decoded);
 
     match mode {
-        Mode::Decrypt => println!("{}", String::from_utf8_lossy(output)),
-        Mode::Encrypt => println!("{}", base64::encode(output)),
+        Mode::Decrypt => println!("{}", String::from_utf8_lossy(&output)),
+        Mode::Encrypt => println!("{}", base64::encode(&output)),
     };
 }
 
