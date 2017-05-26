@@ -15,8 +15,8 @@ distance s0 s1
     | B.length s0 /= B.length s1 = Nothing
     | otherwise = Just (foldr alg 0 (B.zip s0 s1))
   where
-    hamming a b = popCount (xor a b)
-    alg = (+) . uncurry hamming
+    hamming (a, b) = popCount (xor a b)
+    alg            = (+) . hamming
 
 main :: IO ()
 main = do
