@@ -7,6 +7,16 @@ use openssl::symm::{Cipher, Crypter, Mode};
 use std::io::{self, Read};
 use clap::{App, Arg};
 
+fn fixed_xor(target: Vec<u8>, partner: Vec<u8>) -> Vec<u8> {
+    assert_eq!(target.len(), partner.len());
+
+    target
+        .iter()
+        .zip(partner)
+        .map(|(&l, r)| l ^ r)
+        .collect()
+}
+
 fn crypt(cipher: Cipher,
          mode: Mode,
          key: &[u8],
