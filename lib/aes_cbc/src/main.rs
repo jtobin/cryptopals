@@ -25,10 +25,11 @@ fn new_crypter_unpadded(
         key: &[u8],
         iv: Option<&[u8]>
         ) -> Crypter {
+    assert!(key.len() == 16);
 
     let mut crypter = match Crypter::new(cipher, mode, key, iv) {
             Ok(val) => val,
-            Err(err) => panic!("{}", err)
+            Err(err) => panic!("{} - key len {}", err, key.len())
     };
 
     crypter.pad(false);
@@ -37,6 +38,8 @@ fn new_crypter_unpadded(
 }
 
 fn ecb_128_crypt(mode: Mode, key: &[u8], text: &[u8]) -> Vec<u8> {
+    assert!(text.len() % 16 == 0);
+
     let cipher = Cipher::aes_128_ecb();
     let iv     = None;
 
@@ -60,6 +63,8 @@ fn ecb_128_decrypt(key: &[u8], text: &[u8]) -> Vec<u8> {
 }
 
 fn cbc_128_encrypt(key: &[u8], text: &[u8], iv: Vec<u8>) -> Vec<u8> {
+    assert!(iv.len() == 16);
+
     let mut iv = iv;
     let mut ciphertext = Vec::with_capacity(text.len());
 
@@ -140,8 +145,8 @@ fn main() {
     };
 
     let output = match mode {
-            Mode::Decrypt => cbc_128_decrypt(&decoded[..], key, iv),
-            Mode::Encrypt => cbc_128_encrypt(&decoded[..], key, iv),
+            Mode::Decrypt => cbc_128_decrypt(key, &decoded[..], iv),
+            Mode::Encrypt => cbc_128_encrypt(key, &decoded[..], iv),
     };
 
     match mode {
