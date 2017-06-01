@@ -7,15 +7,7 @@ use openssl::symm::{Cipher, Crypter, Mode};
 use std::io::{self, Read};
 use clap::{App, Arg};
 
-fn fixed_xor(target: Vec<u8>, partner: Vec<u8>) -> Vec<u8> {
-    assert_eq!(target.len(), partner.len());
-
-    target
-        .iter()
-        .zip(partner)
-        .map(|(&l, r)| l ^ r)
-        .collect()
-}
+const KEY_SIZE: usize = 16;
 
 fn crypt(cipher: Cipher,
          mode: Mode,
@@ -30,7 +22,7 @@ fn crypt(cipher: Cipher,
 
     let decrypted_len = match crypter.update(&input, result.as_mut_slice()) {
             Ok(val)  => val,
-            Err(err) => panic!("{}", err)
+            Err(err) => panic!("couldn't calculate len: {}", err)
     };
 
     (&result[0..decrypted_len]).to_vec()
@@ -45,7 +37,7 @@ fn new_crypter_unpadded(
 
     let mut crypter = match Crypter::new(cipher, mode, key, iv) {
             Ok(val) => val,
-            Err(err) => panic!("{}", err)
+            Err(err) => panic!("can't create crypter: {}", err)
     };
 
     crypter.pad(false);
@@ -81,7 +73,7 @@ fn main() {
 
     let decoded = match base64::decode(&buffer) {
             Ok(val)  => val,
-            Err(err) => panic!("{}", err)
+            Err(err) => panic!("can't decode from base64: {}", err)
     };
 
     let mode = match args.occurrences_of("mode") {
@@ -91,7 +83,7 @@ fn main() {
 
     let key = match args.value_of("key") {
             Some(text) =>
-                if text.len() == 16 {
+                if text.len() == KEY_SIZE {
                     text.as_bytes()
                 } else {
                     panic!("invalid key length!");

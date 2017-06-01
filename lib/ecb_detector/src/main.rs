@@ -4,6 +4,8 @@ extern crate base64;
 use std::collections::HashSet;
 use std::io::{self, Read};
 
+const KEY_SIZE: usize = 16;
+
 fn ecb_detector(encoded: &[u8], size: usize) -> bool {
     let mut blocks = HashSet::new();
 
@@ -28,7 +30,7 @@ fn main() {
         Err(err) => panic!("{}", err)
     };
 
-    let ecb = ecb_detector(&decoded[..], 16);
+    let ecb = ecb_detector(&decoded[..], KEY_SIZE);
 
     if ecb {
         println!("likely ecb");
