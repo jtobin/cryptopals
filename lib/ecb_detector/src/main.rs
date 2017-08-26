@@ -6,10 +6,10 @@ use std::io::{self, Read};
 
 const KEY_SIZE: usize = 16;
 
-fn ecb_detector(encoded: &[u8], size: usize) -> bool {
+fn ecb_detector(ciphertext: &[u8], size: usize) -> bool {
     let mut blocks = HashSet::new();
 
-    for block in encoded.chunks(size) {
+    for block in ciphertext.chunks(size) {
         if blocks.contains(block) {
             return true;
         }
