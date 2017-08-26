@@ -6,3 +6,4 @@ target
 *.o
 *.hi
 etc/working
+deprecated
