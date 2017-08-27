@@ -7,3 +7,6 @@ target
 *.hi
 etc/working
 deprecated
+/target/
+**/*.rs.bk
+Cargo.lock

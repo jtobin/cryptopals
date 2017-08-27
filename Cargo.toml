@@ -1,0 +1,9 @@
+[package]
+name = "cryptopals"
+version = "0.1.0"
+authors = ["Jared Tobin <jared@jtobin.ca>"]
+
+[dependencies]
+base64 = "0.6.0"
+hex = "0.2.0"
+
