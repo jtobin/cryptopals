@@ -1,6 +1,8 @@
 
+extern crate clap;
 extern crate hex;
 
+use clap::{App, Arg};
 use self::hex::{FromHex, ToHex};
 use std::collections::HashMap;
 use std::io::{self, Read};
@@ -188,13 +190,31 @@ pub fn break_single_byte_xor(string: &str) -> (u8, String) {
 }
 
 fn main() {
+    let args = App::new("break_single_byte_xor")
+                    .version("0.1.0")
+                    .about("Break single-byte XOR")
+                    .arg(Arg::with_name("return-byte")
+                            .short("r")
+                            .long("return-key")
+                            .help("return encrypting byte"))
+                    .get_matches();
+
     let mut buffer = String::new();
 
     io::stdin().read_to_string(&mut buffer)
         .expect("single_byte_xor: bad input");
 
+    let return_byte = match args.occurrences_of("return-byte") {
+        0 => false,
+        _ => true,
+    };
+
     let message = break_single_byte_xor(&buffer);
 
-    println!("{}", message.1);
+    if return_byte {
+        println!("{} ({})", message.0 as char, message.0);
+    } else {
+        println!("{}", message.1);
+    }
 }
 
