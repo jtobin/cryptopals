@@ -3,11 +3,9 @@ extern crate hex;
 
 use self::hex::{FromHex, ToHex};
 use std::collections::HashMap;
+use std::io::{self, Read};
 use std::f32;
 use std::u8;
-
-const INPUT: &'static str =
-    "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736";
 
 fn tally(vec: Vec<u8>) -> HashMap<u8, u8> {
     let mut hashmap = HashMap::new();
@@ -189,7 +187,14 @@ pub fn break_single_byte_xor(string: &str) -> (u8, String) {
     (min.1, min.0)
 }
 
-pub fn s1c3() -> String {
-    break_single_byte_xor(INPUT).1
+fn main() {
+    let mut buffer = String::new();
+
+    io::stdin().read_to_string(&mut buffer)
+        .expect("single_byte_xor: bad input");
+
+    let message = break_single_byte_xor(&buffer);
+
+    println!("({}, {})", message.0, message.1);
 }
 
