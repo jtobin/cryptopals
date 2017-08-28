@@ -195,6 +195,6 @@ fn main() {
 
     let message = break_single_byte_xor(&buffer);
 
-    println!("({}, {})", message.0, message.1);
+    println!("{}", message.1);
 }
 
