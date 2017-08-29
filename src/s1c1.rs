@@ -1,6 +1,6 @@
 
-extern crate hex;
 extern crate base64;
+extern crate hex;
 
 use self::hex::{FromHex, FromHexError};
 use std::process;

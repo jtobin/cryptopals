@@ -15,17 +15,19 @@ fn crypt(cipher: Cipher,
          iv: Option<&[u8]>,
          input : Vec<u8>) -> Vec<u8> {
 
-    let input_len   = input.len();
+    let result_len  = input.len() + cipher.key_len();
+    let mut result  = vec![0u8; result_len];
 
     let mut crypter = new_crypter_unpadded(cipher, mode, key, iv);
-    let mut result  = vec![0u8; input_len + cipher.key_len()];
 
     let decrypted_len = match crypter.update(&input, result.as_mut_slice()) {
             Ok(val)  => val,
             Err(err) => panic!("couldn't calculate len: {}", err)
     };
 
-    (&result[0..decrypted_len]).to_vec()
+    let return_slice = &result[0..decrypted_len];
+
+    return_slice.to_vec()
 }
 
 fn new_crypter_unpadded(
