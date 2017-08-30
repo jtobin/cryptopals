@@ -3,12 +3,12 @@ extern crate base64;
 extern crate openssl;
 
 use self::openssl::symm::{Cipher, Crypter, Mode};
-use std::io::prelude::Read;
 use std::fs::File;
+use std::io::prelude::Read;
 use std::str;
 use std::string::String;
 
-fn new_crypter_unpadded(
+pub fn new_crypter_unpadded(
         cipher: Cipher,
         mode: Mode,
         key: &[u8],
@@ -22,7 +22,7 @@ fn new_crypter_unpadded(
     crypter
 }
 
-fn aes_128_ecb_crypt(mode: Mode, key: &[u8], content: &[u8]) -> Vec<u8> {
+pub fn aes_128_ecb_crypt(mode: Mode, key: &[u8], content: &[u8]) -> Vec<u8> {
     let cipher     = Cipher::aes_128_ecb();
     let iv         = None;
     let bsize      = content.len() + cipher.key_len();
