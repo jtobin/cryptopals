@@ -31,23 +31,21 @@ pub fn black_box_encrypter(message: &[u8]) -> Vec<u8> {
     let between      = Range::new(5, 11);
     let prepend_size = between.ind_sample(&mut rng);
     let append_size  = between.ind_sample(&mut rng);
+    let prepend      = gen_bytes(prepend_size);
+    let append       = gen_bytes(append_size);
 
-    let prepend = gen_bytes(prepend_size);
-    let append  = gen_bytes(append_size);
+    let m_size = prepend_size + message.len() + append_size;
+    let c_size = m_size + BLOCK_SIZE - m_size % BLOCK_SIZE;
 
-    let message_size    = prepend_size + message.len() + append_size;
-    let ciphertext_size =
-            message_size + BLOCK_SIZE - message_size % BLOCK_SIZE;
-
-    let mut ciphertext = Vec::with_capacity(ciphertext_size);
-
-    let key = gen_bytes(KEY_SIZE);
+    let mut ciphertext = Vec::with_capacity(c_size);
 
     ciphertext.extend_from_slice(&prepend);
     ciphertext.extend_from_slice(message);
     ciphertext.extend_from_slice(&append);
 
-    ciphertext = pkcs(&ciphertext, ciphertext_size);
+    ciphertext = pkcs(&ciphertext, c_size);
+
+    let key = gen_bytes(KEY_SIZE);
 
     if rng.gen() {
         aes_128_ecb_crypt(Mode::Encrypt, &key, &ciphertext)
