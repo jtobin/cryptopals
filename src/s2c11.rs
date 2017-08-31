@@ -2,8 +2,8 @@
 extern crate rand;
 extern crate openssl;
 
-use s1c7::aes_128_ecb_crypt;
-use s2c9::pkcs;
+use s1c07::aes_128_ecb_crypt;
+use s2c09::pkcs;
 use s2c10::aes_128_cbc_crypt;
 use self::openssl::symm::Mode;
 use self::rand::Rng;

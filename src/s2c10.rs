@@ -3,7 +3,7 @@ extern crate base64;
 extern crate hex;
 extern crate openssl;
 
-use s1c7::aes_128_ecb_crypt;
+use s1c07::aes_128_ecb_crypt;
 use std::fs::File;
 use self::openssl::symm::Mode;
 use std::io::Read;

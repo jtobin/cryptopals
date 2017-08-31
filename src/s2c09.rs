@@ -13,7 +13,7 @@ pub fn pkcs(block: &[u8], size: usize) -> Vec<u8> {
     vec
 }
 
-pub fn s2c9() -> String {
+pub fn s2c09() -> String {
     let message = "YELLOW_SUBMARINE".as_bytes();
     let padded  = pkcs(message, 20);
 

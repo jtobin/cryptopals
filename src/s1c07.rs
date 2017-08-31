@@ -54,7 +54,7 @@ pub fn aes_128_ecb_encrypt(key: &str, message: &str) -> String {
     base64::encode(&ciphertext)
 }
 
-pub fn s1c7() -> String {
+pub fn s1c07() -> String {
     let key        = base64::encode("YELLOW SUBMARINE");
     let mut handle = File::open("data/s1/q7_input.txt").unwrap();
     let mut buffer = String::new();

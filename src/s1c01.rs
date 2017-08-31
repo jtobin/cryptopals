@@ -14,7 +14,7 @@ pub fn hex_to_b64(input: &str) -> Result<String, FromHexError> {
     raw.map(|contents| base64::encode(&contents))
 }
 
-pub fn s1c1() -> String {
+pub fn s1c01() -> String {
     hex_to_b64(&INPUT).unwrap_or_else(|err| {
             println!("error (cryptopals): {}", err);
             process::exit(1);

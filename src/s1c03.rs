@@ -189,7 +189,7 @@ pub fn break_single_byte_xor(string: &str) -> (u8, String) {
     (min.1, min.0)
 }
 
-pub fn s1c3() -> String {
+pub fn s1c03() -> String {
     break_single_byte_xor(INPUT).1
 }
 

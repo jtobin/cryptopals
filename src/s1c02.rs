@@ -15,6 +15,6 @@ fn fixed_xor(target: &str, partner: &str) -> String {
     l.to_hex()
 }
 
-pub fn s1c2() -> String {
+pub fn s1c02() -> String {
     fixed_xor(&TARGET, &PARTNER)
 }
