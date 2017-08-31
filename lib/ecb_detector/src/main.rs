@@ -33,9 +33,9 @@ fn main() {
     let ecb = ecb_detector(&decoded[..], KEY_SIZE);
 
     if ecb {
-        println!("likely ecb");
+        println!("that's probably ECB-encrypted.");
     } else {
-        println!("likely cbc");
+        println!("that's probably CBC-encrypted.");
     }
 }
 

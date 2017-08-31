@@ -3,6 +3,7 @@ extern crate rand;
 extern crate openssl;
 
 use s1c7::aes_128_ecb_crypt;
+use s2c9::pkcs;
 use s2c10::aes_128_cbc_crypt;
 use self::openssl::symm::Mode;
 use self::rand::Rng;
@@ -34,7 +35,10 @@ pub fn black_box_encrypter(message: &[u8]) -> Vec<u8> {
     let prepend = gen_bytes(prepend_size);
     let append  = gen_bytes(append_size);
 
-    let ciphertext_size = prepend_size + message.len() + append_size;
+    let message_size    = prepend_size + message.len() + append_size;
+    let ciphertext_size =
+            message_size + BLOCK_SIZE - message_size % BLOCK_SIZE;
+
     let mut ciphertext = Vec::with_capacity(ciphertext_size);
 
     let key = gen_bytes(KEY_SIZE);
@@ -43,11 +47,13 @@ pub fn black_box_encrypter(message: &[u8]) -> Vec<u8> {
     ciphertext.extend_from_slice(message);
     ciphertext.extend_from_slice(&append);
 
+    ciphertext = pkcs(&ciphertext, ciphertext_size);
+
     if rng.gen() {
-        aes_128_ecb_crypt(Mode::Encrypt, &key, &message)
+        aes_128_ecb_crypt(Mode::Encrypt, &key, &ciphertext)
     } else {
         let iv = gen_bytes(KEY_SIZE);
-        aes_128_cbc_crypt(Mode::Encrypt, &key, &iv, &message)
+        aes_128_cbc_crypt(Mode::Encrypt, &key, &iv, &ciphertext)
     }
 }
 
@@ -75,14 +81,27 @@ pub fn s2c11() -> String {
         should encrypt to the same thing.  Interesting to see if the oracle
         will actually be able to bust it on this text.  So yeah, anyway, let's
         see what happens.  At the very least there are a bunch of double spaces
-        at the end of sentences.");
+        at the end of sentences.
+
+        Hmm that doesn't seem to be doing it though.  Somehow.  I'll check that
+        function again in a second, but it seems like the easiest thing to do
+        might just be to write more text, use some longer words, etc.  Maybe
+        use some longer words again and again, you know.  Like sentences.  Or
+        somehow.
+
+        What if I were to just include the same exact text multiple times?
+
+        What if I were to just include the same exact text multiple times?
+
+        I said, what if I were to just include the same exact text multiple
+        times?");
 
     let ciphertext = black_box_encrypter(message.as_bytes());
 
     if ecb_detector(&ciphertext, BLOCK_SIZE) {
-        String::from("probably ECB.")
+        String::from("that's probably ECB-encrypted.")
     } else {
-        String::from("probably CBC.")
+        String::from("that's probably CBC-encrypted.")
     }
 }
 
