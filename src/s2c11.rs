@@ -17,7 +17,7 @@ pub fn gen_bytes(size: usize) -> Vec<u8> {
     let mut rng    = rand::thread_rng();
     let mut buffer = Vec::with_capacity(size);
 
-    for foo in 0..size {
+    for _ in 0..size {
         let byte: u8 = rng.gen();
         buffer.push(byte);
     }
