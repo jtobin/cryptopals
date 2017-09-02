@@ -1,7 +1,7 @@
 
 extern crate hex;
 
-use self::hex::{FromHex, ToHex};
+use errors::CryptopalsError;
 use std::collections::HashMap;
 use std::f32;
 use std::u8;
@@ -148,7 +148,10 @@ fn mse(reference: HashMap<u8, f32>, target: HashMap<u8, f32>) -> f32 {
     for (key, val) in reference.iter() {
         if target.contains_key(key) {
 
-            // (jtobin) branch is only entered if 'target' contains 'key'
+            // NB. (jtobin)
+            //
+            // Branch is only entered if 'target' contains 'key', so 'unwrap'
+            // can't be called.
             let tval   = target.get(key).unwrap();
             let sqdiff = (tval - val).powf(2.0);
             result.insert(key, sqdiff);
@@ -160,36 +163,41 @@ fn mse(reference: HashMap<u8, f32>, target: HashMap<u8, f32>) -> f32 {
     result.iter().fold(0.0, |sum, (_, val)| sum + val / size as f32)
 }
 
-fn score(string: &str) -> f32 {
-    let decoded   = FromHex::from_hex(&string).unwrap();
-    let freq_dist = frequency_distribution(decoded);
-
-    mse(freqs_ascii(), freq_dist)
+fn score(input: &[u8]) -> f32 {
+    mse(freqs_ascii(), frequency_distribution(input.to_vec()))
 }
 
-pub fn break_single_byte_xor(string: &str) -> (u8, String) {
-    let bytes: Vec<u8> = FromHex::from_hex(&string).unwrap();
-
-    let mut min = ("hi!".to_string(), 0, f32::INFINITY);
+pub fn break_single_byte_xor(bytes: &[u8]) -> (u8, Vec<u8>) {
+    let mut min = (Vec::new(), 0, f32::INFINITY);
 
     for ascii_char in 32..126 {
-        let mut other_bytes = bytes.clone();
+        let xored: Vec<u8> = bytes.iter()
+            .map(|byte| byte ^ ascii_char)
+            .collect();
 
-        for byte in other_bytes.iter_mut() {
-            *byte ^= ascii_char;
+        let result = score(&xored);
+
+        if result < min.2 {
+            min = (xored, ascii_char, result);
         }
-
-        let decoded = String::from_utf8(other_bytes).unwrap();
-        let encoded = ToHex::to_hex(&decoded.clone());
-        let result  = score(&encoded);
-
-        if result < min.2 { min = (decoded, ascii_char, result); }
     }
 
     (min.1, min.0)
 }
 
-pub fn s1c03() -> String {
-    break_single_byte_xor(INPUT).1
+pub fn s1c03() -> Result<String, CryptopalsError> {
+    let ciphertext: Result<Vec<u8>, CryptopalsError> =
+            hex::FromHex::from_hex(INPUT)
+                .map_err(|err| CryptopalsError::HexConversionError(err));
+
+    let ciphertext = match ciphertext {
+        Ok(val) => val,
+        Err(err) => return Err(err)
+    };
+
+    let message = break_single_byte_xor(&ciphertext).1;
+
+    String::from_utf8(message)
+        .map_err(|err| CryptopalsError::Utf8ConversionError(err))
 }
 

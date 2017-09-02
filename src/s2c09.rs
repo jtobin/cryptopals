@@ -1,7 +1,7 @@
 
 extern crate base64;
 
-pub fn pkcs(block: &[u8], size: usize) -> Vec<u8> {
+pub fn pad_pkcs7(block: &[u8], size: usize) -> Vec<u8> {
     let mut vec = Vec::with_capacity(size);
     let len     = block.len();
 
@@ -15,7 +15,7 @@ pub fn pkcs(block: &[u8], size: usize) -> Vec<u8> {
 
 pub fn s2c09() -> String {
     let message = "YELLOW_SUBMARINE".as_bytes();
-    let padded  = pkcs(message, 20);
+    let padded  = pad_pkcs7(message, 20);
 
     base64::encode(&padded)
 }

@@ -3,7 +3,7 @@ extern crate rand;
 extern crate openssl;
 
 use s1c07::aes_128_ecb_crypt;
-use s2c09::pkcs;
+use s2c09::pad_pkcs7;
 use s2c10::aes_128_cbc_crypt;
 use self::openssl::symm::Mode;
 use self::rand::Rng;
@@ -43,7 +43,7 @@ pub fn black_box_encrypter(message: &[u8]) -> Vec<u8> {
     ciphertext.extend_from_slice(message);
     ciphertext.extend_from_slice(&append);
 
-    ciphertext = pkcs(&ciphertext, c_size);
+    ciphertext = pad_pkcs7(&ciphertext, c_size);
 
     let key = gen_bytes(KEY_SIZE);
 

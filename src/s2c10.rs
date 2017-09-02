@@ -53,31 +53,7 @@ pub fn aes_128_cbc_crypt(
     buffer
 }
 
-pub fn aes_128_cbc_decrypt(key: &str, iv: &str, ciphertext: &str) -> String {
-    let key: Vec<u8>        = base64::decode(&key).unwrap();
-    let iv:  Vec<u8>        = base64::decode(&iv).unwrap();
-    let ciphertext: Vec<u8> = base64::decode(&ciphertext).unwrap();
-
-    let message =
-        aes_128_cbc_crypt(Mode::Decrypt, &key[..], &iv[..], &ciphertext[..]);
-
-    base64::encode(&message)
-}
-
-pub fn aes_128_cbc_encrypt(key: &str, iv: &str, message: &str) -> String {
-    let key: Vec<u8>        = base64::decode(&key).unwrap();
-    let iv:  Vec<u8>        = base64::decode(&iv).unwrap();
-    let message: Vec<u8>    = base64::decode(&message).unwrap();
-
-    let ciphertext =
-        aes_128_cbc_crypt(Mode::Encrypt, &key[..], &iv[..], &message[..]);
-
-    base64::encode(&ciphertext)
-}
-
-
 pub fn s2c10() -> String {
-    let key        = base64::encode("YELLOW SUBMARINE");
     let mut handle = File::open("data/s2/q10_input.txt").unwrap();
     let mut buffer = String::new();
 
@@ -87,16 +63,18 @@ pub fn s2c10() -> String {
         panic!("{}", err);
     }
 
-    let trimmed: String = buffer.chars()
+    let ciphertext: String = buffer.chars()
             .filter(|&char| char != '\n')
             .collect();
 
-    let iv = vec![0u8; BLOCK_SIZE];
-    let iv = base64::encode(&iv);
+    let ciphertext = base64::decode(&ciphertext).unwrap();
 
-    let decrypted = aes_128_cbc_decrypt(&key, &iv, &trimmed);
-    let decrypted = base64::decode(&decrypted).unwrap();
+    let key = b"YELLOW SUBMARINE";
 
-    String::from_utf8(decrypted).unwrap()
+    let iv  = vec![0u8; BLOCK_SIZE];
+
+    let message = aes_128_cbc_crypt(Mode::Decrypt, &key[..], &iv, &ciphertext);
+
+    String::from_utf8(message).unwrap()
 }
 

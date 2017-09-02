@@ -5,7 +5,6 @@ extern crate openssl;
 use self::openssl::symm::{Cipher, Crypter, Mode};
 use std::fs::File;
 use std::io::prelude::Read;
-use std::str;
 use std::string::String;
 
 pub fn new_crypter_unpadded(
@@ -36,42 +35,22 @@ pub fn aes_128_ecb_crypt(mode: Mode, key: &[u8], content: &[u8]) -> Vec<u8> {
     buffer[0..crypted_len + finalized_len].to_vec()
 }
 
-pub fn aes_128_ecb_decrypt(key: &str, ciphertext: &str) -> String {
-    let key: Vec<u8>        = base64::decode(&key).unwrap();
-    let ciphertext: Vec<u8> = base64::decode(&ciphertext).unwrap();
-
-    let message = aes_128_ecb_crypt(Mode::Decrypt, &key[..], &ciphertext[..]);
-
-    base64::encode(&message)
-}
-
-pub fn aes_128_ecb_encrypt(key: &str, message: &str) -> String {
-    let key: Vec<u8>     = base64::decode(&key).unwrap();
-    let message: Vec<u8> = base64::decode(&message).unwrap();
-
-    let ciphertext = aes_128_ecb_crypt(Mode::Encrypt, &key[..], &message[..]);
-
-    base64::encode(&ciphertext)
-}
-
 pub fn s1c07() -> String {
-    let key        = base64::encode("YELLOW SUBMARINE");
     let mut handle = File::open("data/s1/q7_input.txt").unwrap();
     let mut buffer = String::new();
 
-    let bsize = handle.read_to_string(&mut buffer);
+    let _ = handle.read_to_string(&mut buffer).unwrap();
 
-    if let Err(err) = bsize {
-        panic!("{}", err);
-    }
-
-    let trimmed: String = buffer.chars()
-            .filter(|&char| char != '\n')
+    let ciphertext: String = buffer.chars()
+            .filter(|&c| c != '\n')
             .collect();
 
-    let decrypted = aes_128_ecb_decrypt(&key, &trimmed);
-    let decrypted = base64::decode(&decrypted).unwrap();
+    let ciphertext = base64::decode(&ciphertext).unwrap();
 
-    String::from_utf8(decrypted).unwrap()
+    let key = b"YELLOW SUBMARINE";
+
+    let message = aes_128_ecb_crypt(Mode::Decrypt, &key[..], &ciphertext);
+
+    String::from_utf8(message).unwrap()
 }
 
