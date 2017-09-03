@@ -69,6 +69,23 @@ pub fn ecb_detector(ciphertext: &[u8], size: usize) -> bool {
     false
 }
 
+pub fn ecb_oracle<F>(f: F, size: usize) -> bool
+        where F: Fn(&[u8]) -> Vec<u8> {
+
+    let blocks = 6;
+
+    let mut buffer = Vec::with_capacity(size * blocks);
+
+    for _ in 0..blocks {
+        buffer.extend_from_slice(b"ABRACADABRABRA!!");
+    }
+
+    let ciphertext = f(&buffer);
+
+    ecb_detector(&ciphertext, size)
+}
+
+
 pub fn s2c11() -> String {
     let message = String::from(
         "Here I'm just gonna try something crazy and type a bunch of words.
@@ -97,9 +114,9 @@ pub fn s2c11() -> String {
     let ciphertext = black_box_encrypter(message.as_bytes());
 
     if ecb_detector(&ciphertext, BLOCK_SIZE) {
-        String::from("that's probably ECB-encrypted.")
+        String::from("the sample message was probably ECB-encrypted.")
     } else {
-        String::from("that's probably CBC-encrypted.")
+        String::from("the sample message was probably CBC-encrypted.")
     }
 }
 
