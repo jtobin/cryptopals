@@ -77,7 +77,7 @@ pub fn ecb_oracle<F>(f: F, size: usize) -> bool
     let mut buffer = Vec::with_capacity(size * blocks);
 
     for _ in 0..blocks {
-        buffer.extend_from_slice(b"ABRACADABRABRA!!");
+        buffer.extend_from_slice(b"AAAAAAAAAAAAAAAA");
     }
 
     let ciphertext = f(&buffer);
