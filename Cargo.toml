@@ -7,6 +7,7 @@ authors = ["Jared Tobin <jared@jtobin.ca>"]
 base64  = "0.6"
 clap    = "2.26"
 hex     = "0.2"
-openssl = "0.9"
+openssl = "0.10"
 rand    = "0.3"
+combine = "2.5"
 
