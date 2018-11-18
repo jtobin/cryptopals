@@ -4,9 +4,9 @@ version = "0.1.0"
 authors = ["Jared Tobin <jared@jtobin.ca>"]
 
 [dependencies]
-base64  = "0.6"
+base64  = "0.10.0"
 clap    = "2.26"
-hex     = "0.2"
+hex     = "0.3.2"
 openssl = "0.10"
 rand    = "0.3"
 combine = "2.5"

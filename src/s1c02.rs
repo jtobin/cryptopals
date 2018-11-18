@@ -1,9 +1,6 @@
 
 extern crate hex;
 
-use errors::CryptopalsError;
-use self::hex::{FromHex, ToHex};
-
 const TARGET: &str  = "1c0111001f010100061a024b53535009181c";
 const PARTNER: &str = "686974207468652062756c6c277320657965";
 
@@ -14,22 +11,12 @@ pub fn fixed_xor(target: &[u8], partner: &[u8]) -> Vec<u8> {
         .collect()
 }
 
-pub fn s1c02() -> Result<String, CryptopalsError> {
-    let target: Result<Vec<u8>, _> = FromHex::from_hex(&TARGET)
-            .map_err(|err| CryptopalsError::HexConversionError(err));
-
-    let target = match target {
-        Ok(val) => val,
-        Err(err) => return Err(err)
-    };
-
-    let partner: Result<Vec<u8>, _> = FromHex::from_hex(&PARTNER)
-            .map_err(|err| CryptopalsError::HexConversionError(err));
-
-    let partner = match partner {
-        Ok(val) => val,
-        Err(err) => return Err(err)
-    };
-
-    Ok(fixed_xor(&target, &partner).to_hex())
+#[test]
+fn test_fixed_xor() {
+    let hex0 = hex::decode(TARGET).unwrap();
+    let hex1 = hex::decode(PARTNER).unwrap();
+    let xor = fixed_xor(&hex0, &hex1);
+    let expected = "746865206b696420646f6e277420706c6179";
+    assert_eq!(hex::encode(xor), expected)
 }
+

@@ -1,13 +1,9 @@
 
 extern crate hex;
 
-use errors::CryptopalsError;
 use std::collections::HashMap;
 use std::f32;
 use std::u8;
-
-const INPUT: &'static str =
-    "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736";
 
 fn tally(vec: Vec<u8>) -> HashMap<u8, u8> {
     let mut hashmap = HashMap::new();
@@ -185,19 +181,14 @@ pub fn break_single_byte_xor(bytes: &[u8]) -> (u8, Vec<u8>) {
     (min.1, min.0)
 }
 
-pub fn s1c03() -> Result<String, CryptopalsError> {
-    let ciphertext: Result<Vec<u8>, CryptopalsError> =
-            hex::FromHex::from_hex(INPUT)
-                .map_err(|err| CryptopalsError::HexConversionError(err));
+#[test]
+fn test_break_single_byte_xor() {
+    const INPUT: &'static str =
+        "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736";
 
-    let ciphertext = match ciphertext {
-        Ok(val) => val,
-        Err(err) => return Err(err)
-    };
-
+    let ciphertext = hex::decode(INPUT).unwrap();
     let message = break_single_byte_xor(&ciphertext).1;
-
-    String::from_utf8(message)
-        .map_err(|err| CryptopalsError::Utf8ConversionError(err))
+    let output = String::from_utf8(message).unwrap();
+    assert_eq!(output, "Cooking MC's like a pound of bacon");
 }
 
