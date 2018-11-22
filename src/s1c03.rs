@@ -138,17 +138,12 @@ pub fn freqs_ascii() -> HashMap<u8, f32> {
     ].iter().cloned().collect()
 }
 
-fn mse(reference: HashMap<u8, f32>, target: HashMap<u8, f32>) -> f32 {
+fn mse(expected: HashMap<u8, f32>, observed: HashMap<u8, f32>) -> f32 {
     let mut result = HashMap::new();
 
-    for (key, val) in reference.iter() {
-        if target.contains_key(key) {
-
-            // NB. (jtobin)
-            //
-            // Branch is only entered if 'target' contains 'key', so 'unwrap'
-            // can't be called.
-            let tval   = target.get(key).unwrap();
+    for (key, val) in expected.iter() {
+        if observed.contains_key(key) {
+            let tval   = observed.get(key).unwrap();
             let sqdiff = (tval - val).powf(2.0);
             result.insert(key, sqdiff);
         }
