@@ -1,8 +1,0 @@
-[package]
-name = "repeating_key_xor"
-version = "0.1.0"
-authors = ["Jared Tobin <jared@jtobin.ca>"]
-
-[dependencies]
-
-rustc-serialize = "0.3.0"

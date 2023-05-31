@@ -1,8 +1,0 @@
-[package]
-name = "break_single_byte_xor"
-version = "0.1.0"
-authors = ["Jared Tobin <jared@jtobin.ca>"]
-
-[dependencies]
-hex = "0.2.0"
-clap = "2.26.0"
