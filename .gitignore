@@ -1,12 +1,4 @@
-rust_intro
-probs
-bin
-target
-*.swp
-*.o
-*.hi
-etc/working
-deprecated
-/target/
-**/*.rs.bk
-Cargo.lock
+.cabal-sandbox
+cabal.sandbox.config
+dist-newstyle
+*swp
