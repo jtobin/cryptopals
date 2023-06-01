@@ -15,15 +15,18 @@ library
     LambdaCase
     OverloadedStrings
     RecordWildCards
+    ViewPatterns
   hs-source-dirs:
     lib
   exposed-modules:
       Cryptopals.Util
+    , Cryptopals.Util.Similarity
   build-depends:
       base
     , base16
     , base64
     , bytestring
+    , containers
     , text
 
 executable fixed-xor
@@ -33,7 +36,21 @@ executable fixed-xor
   hs-source-dirs:    src
   build-depends:
       base
+    , base16
     , bytestring
     , cryptopals
     , optparse-applicative
     , text
+
+executable break-single-byte-xor
+  main-is:           BreakSingleByteXor.hs
+  ghc-options:       -Wall -O2
+  default-language:  Haskell2010
+  hs-source-dirs:    src
+  build-depends:
+      base
+    , bytestring
+    , cryptopals
+    , optparse-applicative
+    , text
+
