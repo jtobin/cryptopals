@@ -3,15 +3,16 @@
 
 module Main where
 
-import Control.Monad (unless)
 import qualified Cryptopals.Util as CU
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Base16 as B16
 import Data.List (foldl')
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import qualified Data.Text.Encoding as TE
 import GHC.Word (Word8)
 import qualified Options.Applicative as O
+import qualified System.Exit as SE
 import qualified System.IO as SIO
 
 data Args = Args { argsInp :: T.Text }
@@ -28,29 +29,33 @@ best s = foldl' alg (0, CU.score s, s) [32..126] where
         then (b, sc, xo)
         else acc
 
-render :: Show a => a -> T.Text
-render = T.pack.  show
-
 decipher :: Args -> IO ()
 decipher Args {..} = do
-  let s  = TE.encodeUtf8 argsInp
+  let render :: Show a => a -> T.Text
+      render = T.pack . show
 
-  TIO.hPutStrLn SIO.stderr $
-    "cryptopals: input similarity score is " <> render (CU.score s)
+      err = TIO.hPutStrLn SIO.stderr
+      out = TIO.hPutStrLn SIO.stdout
 
-  let (byt, bsc, b) = best s
+      args = B16.decodeBase16 $ TE.encodeUtf8 argsInp
 
-  unless (b == s) $ do
+  case args of
+    Left e -> do
+      err $ "cryptopals: " <> e
+      SE.exitFailure
 
-    TIO.hPutStrLn SIO.stderr (
-      "cryptopals: xor-ing with " <> render byt <>
-      " yields score " <> render bsc
-      )
+    Right s -> do
+      err $ "cryptopals: input similarity score is " <> render (CU.score s)
 
-    TIO.hPutStrLn SIO.stderr $
-      "cryptopals: result"
+      let (byt, bsc, b) = best s
 
-    TIO.hPutStrLn SIO.stdout $ TE.decodeUtf8 b
+      err (
+        "cryptopals: xor-ing with " <> render byt <>
+        " yields " <> render bsc
+        )
+
+      err $ "cryptopals: result"
+      out . TE.decodeUtf8 . B16.encodeBase16' $ b
 
 main :: IO ()
 main = do

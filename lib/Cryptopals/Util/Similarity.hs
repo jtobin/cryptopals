@@ -13,7 +13,7 @@ mse :: IMS.IntMap Double -> IMS.IntMap Double -> Double
 mse ref tar =
     let res = IMS.foldlWithKey' alg mempty ref
         siz = IMS.size res
-    in  IMS.foldl' (\acc val -> (acc + val) / fromIntegral siz) 0 res
+    in  IMS.foldl' (\acc val -> acc + val / fromIntegral siz) 0 res
   where
     alg acc key val = case IMS.lookup key tar of
       Nothing  -> acc
@@ -35,7 +35,7 @@ normalize m =
 
 -- | Observed frequency distribution of bytes in English corpora.
 english :: IMS.IntMap Double
-english = IMS.fromList [
+english = IMS.fromAscList [
     (9, 0.000057)
   , (23, 0.000000)
   , (32, 0.171662)

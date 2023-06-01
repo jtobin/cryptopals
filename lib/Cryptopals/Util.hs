@@ -30,8 +30,6 @@ hexToB64 (Hex b) = do
 fixedXor :: BS.ByteString -> BS.ByteString -> BS.ByteString
 fixedXor l r = BS.pack $ BS.zipWith B.xor l r
 
-singleByteXor :: Word8 -> Hex -> Either T.Text Hex
-singleByteXor byt (Hex bs) = do
-  s <- B16.decodeBase16 bs
-  pure $ Hex (B16.encodeBase16' . BS.map (B.xor byt) $ s)
+singleByteXor :: Word8 -> BS.ByteString -> BS.ByteString
+singleByteXor byt = BS.map (B.xor byt)
 

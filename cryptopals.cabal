@@ -49,6 +49,7 @@ executable break-single-byte-xor
   hs-source-dirs:    src
   build-depends:
       base
+    , base16
     , bytestring
     , cryptopals
     , optparse-applicative
