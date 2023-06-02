@@ -4,8 +4,11 @@ module Cryptopals.Util (
 
   , hexToB64
   , fixedXor
+  , CUS.often
   , CUS.score
+  , repeatingKeyXor
   , singleByteXor
+  , CUS.tally
   ) where
 
 import qualified Cryptopals.Util.Similarity as CUS
@@ -32,4 +35,10 @@ fixedXor l r = BS.pack $ BS.zipWith B.xor l r
 
 singleByteXor :: Word8 -> BS.ByteString -> BS.ByteString
 singleByteXor byt = BS.map (B.xor byt)
+
+repeatingKeyXor :: BS.ByteString -> BS.ByteString -> BS.ByteString
+repeatingKeyXor key pla =
+  let pl = BS.length pla
+      ks = BS.pack $ take pl (cycle (BS.unpack key))
+  in  BS.pack $ BS.zipWith B.xor ks pla
 

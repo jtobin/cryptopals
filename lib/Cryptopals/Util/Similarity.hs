@@ -1,9 +1,13 @@
 module Cryptopals.Util.Similarity (
     score
+  , tally
+  , often
   ) where
 
 import qualified Data.ByteString as BS
+import Data.Function (on)
 import qualified Data.IntMap.Strict as IMS
+import qualified Data.List as L
 
 -- | Similarity of the byte encoding to English plaintext. Smaller is better.
 score :: BS.ByteString -> Double
@@ -21,6 +25,9 @@ mse ref tar =
 
 dist :: BS.ByteString -> IMS.IntMap Double
 dist = normalize . tally
+
+often :: BS.ByteString -> [(Int, Int)]
+often = L.sortBy (flip compare `on` snd) . IMS.toList . tally
 
 tally :: BS.ByteString -> IMS.IntMap Int
 tally = BS.foldl' alg mempty where
