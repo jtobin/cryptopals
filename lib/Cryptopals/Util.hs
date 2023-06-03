@@ -2,15 +2,21 @@ module Cryptopals.Util (
     Hex(..)
   , Base64(..)
 
+  , CUB.chunks
+  , CUB.hamming
   , hexToB64
   , fixedXor
+  , CUB.nhamming
   , CUS.often
-  , CUS.score
+  , CUB.panhamming
   , repeatingKeyXor
+  , CUB.rotate
+  , CUS.score
   , singleByteXor
   , CUS.tally
   ) where
 
+import qualified Cryptopals.Util.ByteString as CUB
 import qualified Cryptopals.Util.Similarity as CUS
 import qualified Data.Bits as B
 import qualified Data.ByteString as BS

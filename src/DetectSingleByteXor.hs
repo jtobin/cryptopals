@@ -9,7 +9,6 @@ import qualified Data.ByteString.Char8 as B8
 import qualified Data.Foldable as F
 import Data.Function (on)
 import qualified Data.List as L
--- import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import qualified Data.Text.Encoding as TE
 import qualified Options.Applicative as O

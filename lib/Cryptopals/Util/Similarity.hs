@@ -9,7 +9,7 @@ import Data.Function (on)
 import qualified Data.IntMap.Strict as IMS
 import qualified Data.List as L
 
--- | Similarity of the byte encoding to English plaintext. Smaller is better.
+-- | Distance of the encoding from expected English plaintext.
 score :: BS.ByteString -> Double
 score = mse english . dist
 

@@ -6,6 +6,7 @@ module Main where
 import qualified Cryptopals.Util as CU
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as B16
+import qualified Data.Char as C
 import Data.List (foldl')
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -15,10 +16,22 @@ import qualified Options.Applicative as O
 import qualified System.Exit as SE
 import qualified System.IO as SIO
 
-data Args = Args { argsInp :: T.Text }
+data Mode =
+    Decrypt
+  | Log
+
+data Args = Args {
+    argsInp :: T.Text
+  , argsMod :: Mode
+  }
 
 ops :: O.Parser Args
-ops = Args <$> O.argument O.str (O.metavar "INPUT")
+ops = Args
+  <$> O.argument O.str (O.metavar "INPUT")
+  <*> O.flag Decrypt Log (
+        O.long "log" <> O.short 'l' <>
+        O.help "log the likely enciphering byte"
+        )
 
 best :: BS.ByteString -> (Word8, Double, BS.ByteString)
 best s = foldl' alg (0, CU.score s, s) [32..126] where
@@ -55,7 +68,9 @@ decipher Args {..} = do
         )
 
       err $ "cryptopals: result"
-      out . TE.decodeUtf8 . B16.encodeBase16' $ b
+      case argsMod of
+        Decrypt -> out . TE.decodeUtf8 . B16.encodeBase16' $ b
+        Log     -> out . render $ C.chr (fromIntegral byt)
 
 main :: IO ()
 main = do

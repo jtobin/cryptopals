@@ -10,22 +10,37 @@ import qualified Data.Text.Encoding as TE
 import qualified Data.Text.IO as TIO
 import qualified Options.Applicative as O
 
+data Encoding =
+    Utf8
+  | Utf16
+
 data Args = Args {
     argsKey :: T.Text
   , argsInp :: T.Text
+  , argsEnc :: Encoding
   }
 
 ops :: O.Parser Args
 ops = Args
   <$> O.argument O.str (O.metavar "KEY")
   <*> O.argument O.str (O.metavar "INPUT")
+  <*> O.flag Utf8 Utf16 (
+        O.long "hex" <>
+        O.help "input is hex-encoded"
+        )
 
 rxor :: Args -> IO ()
 rxor Args {..} = do
-  let (k, v) = (TE.encodeUtf8 argsKey, TE.encodeUtf8 argsInp)
-      res    = CU.repeatingKeyXor k v
+  let k = TE.encodeUtf8 argsKey
+      v = case argsEnc of
+            Utf8  -> pure $ TE.encodeUtf8 argsInp
+            Utf16 -> B16.decodeBase16 (TE.encodeUtf8 argsInp)
 
-  TIO.putStrLn . TE.decodeUtf8 . B16.encodeBase16' $ res
+  case v of
+    Left e  -> error "FIXME"
+    Right s ->
+      TIO.putStrLn . TE.decodeUtf8 . B16.encodeBase16' $
+        CU.repeatingKeyXor k s
 
 main :: IO ()
 main = do
