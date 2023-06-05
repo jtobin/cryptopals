@@ -3,6 +3,7 @@
 
 module Main where
 
+import Control.Applicative (optional)
 import qualified Cryptopals.AES as AES
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.Char as C
@@ -17,8 +18,14 @@ data Operation =
     Encrypt
   | Decrypt
 
+data Mode =
+    ECB
+  | CBC
+
 data Args = Args {
     argsOpr :: Operation
+  , argsMod :: Mode
+  , argsIv  :: Maybe T.Text
   , argsKey :: T.Text
   , argsInp :: T.Text
   }
@@ -26,6 +33,8 @@ data Args = Args {
 ops :: O.Parser Args
 ops = Args
   <$> operationParser
+  <*> modeParser
+  <*> optional (O.strOption (O.long "iv" <> O.metavar "IV"))
   <*> O.argument O.str (O.metavar "KEY")
   <*> O.argument O.str (O.metavar "INPUT")
 
@@ -39,12 +48,25 @@ operationParser = O.argument op etc where
   etc = O.metavar "OPERATION"
      <> O.help "{encrypt, decrypt}"
 
+modeParser :: O.Parser Mode
+modeParser = O.argument mode etc where
+  mode = O.eitherReader $ \input -> case fmap C.toLower input of
+    "ecb" -> pure ECB
+    "cbc" -> pure CBC
+    _     -> Left ("invalid mode: " <> input)
+
+  etc = O.metavar "MODE"
+     <> O.help "{ecb, cbc}"
+
 aes :: Args -> IO ()
 aes Args {..} = do
   let args = do
         k <- B16.decodeBase16 $ TE.encodeUtf8 argsKey
         v <- B16.decodeBase16 $ TE.encodeUtf8 argsInp
         pure (k, v)
+
+      out = TIO.putStrLn . TE.decodeUtf8 . B16.encodeBase16'
+      err = TIO.hPutStrLn SIO.stderr
 
   case args of
     Left e -> do
@@ -53,11 +75,36 @@ aes Args {..} = do
 
     Right (k, v) -> do
       case argsOpr of
-        Encrypt -> TIO.putStrLn . TE.decodeUtf8 . B16.encodeBase16' $
-          AES.encryptEcbAES128 k v
+        Encrypt -> case argsMod of
+          ECB -> out $ AES.encryptEcbAES128 k v
 
-        Decrypt -> TIO.putStrLn . TE.decodeUtf8 . B16.encodeBase16' $
-          AES.decryptEcbAES128 k v
+          CBC -> case argsIv of
+            Nothing -> do
+              err $ "cryptopals: must provide IV"
+              SE.exitFailure
+
+            Just miv -> case B16.decodeBase16 (TE.encodeUtf8 miv) of
+              Left e -> do
+                err $ "cryptopals: " <> e
+                SE.exitFailure
+
+              Right iv ->
+                out $ AES.encryptCbcAES128 iv k v
+
+        Decrypt -> case argsMod of
+          ECB -> out $ AES.decryptEcbAES128 k v
+
+          CBC -> case argsIv of
+            Nothing -> do
+              err $ "cryptopals: must provide IV"
+              SE.exitFailure
+            Just miv -> case B16.decodeBase16 (TE.encodeUtf8 miv) of
+              Left e -> do
+                err $ "cryptopals: " <> e
+                SE.exitFailure
+
+              Right iv ->
+                out $ AES.decryptCbcAES128 iv k v
 
 main :: IO ()
 main = do

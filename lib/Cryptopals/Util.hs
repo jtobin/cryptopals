@@ -1,19 +1,18 @@
 module Cryptopals.Util (
-    Hex(..)
-  , Base64(..)
-
-  , CUB.chunks
+    CUB.chunks
   , CUB.hamming
-  , hexToB64
   , fixedXor
   , CUB.nhamming
   , CUS.often
   , CUB.panhamming
+  , pkcs7
   , repeatingKeyXor
   , CUB.rotate
+  , roundUpToMul
   , CUS.score
   , singleByteXor
   , CUS.tally
+  , unpkcs7
   ) where
 
 import qualified Cryptopals.Util.ByteString as CUB
@@ -24,17 +23,6 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Base64 as B64
 import qualified Data.Text as T
 import GHC.Word (Word8)
-
-newtype Hex = Hex BS.ByteString
-  deriving (Eq, Show)
-
-newtype Base64 = Base64 BS.ByteString
-  deriving (Eq, Show)
-
-hexToB64 :: Hex -> Either T.Text Base64
-hexToB64 (Hex b) = do
-  b16 <- B16.decodeBase16 b
-  pure $ Base64 (B64.encodeBase64' b16)
 
 fixedXor :: BS.ByteString -> BS.ByteString -> BS.ByteString
 fixedXor l r = BS.pack $ BS.zipWith B.xor l r
@@ -47,4 +35,28 @@ repeatingKeyXor key pla =
   let pl = BS.length pla
       ks = BS.pack $ take pl (cycle (BS.unpack key))
   in  BS.pack $ BS.zipWith B.xor ks pla
+
+pkcs7 :: Int -> BS.ByteString -> BS.ByteString
+pkcs7 tar bs =
+  let len = BS.length bs
+      byt = tar - len `mod` tar
+  in  bs <> BS.replicate byt (fromIntegral byt)
+
+unpkcs7 :: BS.ByteString -> Maybe BS.ByteString
+unpkcs7 bs = do
+  (_, c) <- BS.unsnoc bs
+  let len = BS.length bs
+  if   fromIntegral c > len
+  then Nothing
+  else let (str, pad) = BS.splitAt (len - fromIntegral c) bs
+       in  if   BS.all (== fromIntegral (BS.length pad)) pad
+           then pure str
+           else Nothing
+
+roundUpToMul :: Int -> Int -> Int
+roundUpToMul mul num =
+  let r = num `rem` mul
+  in  if   r == 0
+      then num
+      else num + mul - r
 
