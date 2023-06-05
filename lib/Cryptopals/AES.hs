@@ -22,10 +22,10 @@ decryptEcbAES128 key = CT.ecbDecrypt (initAES128 key)
 
 encryptCbcAES128
   :: BS.ByteString -> BS.ByteString -> BS.ByteString -> BS.ByteString
-encryptCbcAES128 iv key plaintext = loop iv mempty (BS.splitAt 16 plaintext)
+encryptCbcAES128 iv key plaintext = loop iv iv (BS.splitAt 16 plaintext)
   where
-    loop !fiv !acc (b, bs) =
-      let xed  = CU.fixedXor fiv b
+    loop las !acc (b, bs) =
+      let xed  = CU.fixedXor las b
           enc  = encryptEcbAES128 key xed
           nacc = acc <> enc
       in  if   BS.null bs
@@ -33,12 +33,14 @@ encryptCbcAES128 iv key plaintext = loop iv mempty (BS.splitAt 16 plaintext)
           else loop enc nacc (BS.splitAt 16 bs)
 
 decryptCbcAES128
-  :: BS.ByteString -> BS.ByteString -> BS.ByteString -> BS.ByteString
-decryptCbcAES128 iv key ciphertext = loop iv mempty (BS.splitAt 16 ciphertext)
+  :: BS.ByteString -> BS.ByteString -> BS.ByteString
+decryptCbcAES128 key ciphertext =
+    let (iv, cip) = BS.splitAt 16 ciphertext
+    in  loop iv mempty (BS.splitAt 16 cip)
   where
-    loop !fiv !acc (b, bs) =
+    loop !las !acc (b, bs) =
       let dec  = decryptEcbAES128 key b
-          nacc = acc <> CU.fixedXor dec fiv
+          nacc = acc <> CU.fixedXor dec las
           niv  = b
       in  if   BS.null bs
           then nacc

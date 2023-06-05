@@ -40,8 +40,7 @@ chaosEncrypter plaintext gen = do
   pos  <- MWC.uniformR (5, 10) gen >>= flip bytes gen
 
   let tex = pre <> plaintext <> pos
-      pad = CU.roundUpToMul 16 (BS.length tex)
-      bs = CU.pkcs7 pad tex
+      bs  = CU.lpkcs7 tex
 
   ecb  <- MWC.uniform gen
 
@@ -61,8 +60,7 @@ alienEncrypter plaintext =
         ]
 
       par = plaintext <> pos
-      pad = CU.roundUpToMul 16 (BS.length par)
-      bs  = CU.pkcs7 pad par
+      bs  = CU.lpkcs7 par
 
   in  AES.encryptEcbAES128 consistentKey bs
 
@@ -147,8 +145,7 @@ cpeEncrypt :: BS.ByteString -> BS.ByteString
 cpeEncrypt user =
   let tex = TE.encodeUtf8 $ profileFor (TE.decodeUtf8 user)
 
-      pad = CU.roundUpToMul 16 (BS.length tex)
-      bs  = CU.pkcs7 pad tex
+      bs  = CU.lpkcs7 tex
 
   in  AES.encryptEcbAES128 consistentKey bs
 
@@ -173,8 +170,7 @@ weirdEncrypter plaintext gen = do
   pre <- bytes bys gen
 
   let par = pre <> plaintext <> pos
-      pad = CU.roundUpToMul 16 (BS.length par)
-      bs  = CU.pkcs7 pad par
+      bs  = CU.lpkcs7 par
 
   pure $ AES.encryptEcbAES128 consistentKey bs
 
@@ -206,6 +202,17 @@ attackProxy oracle input gen = loop gen where
     then loop g
     else pure $ BS.drop 16 target
 
-nubplusplus :: (Eq a, Ord a) => [a] -> [a]
-nubplusplus = fmap NE.head . NE.group . L.sort
+-- bitflipping CBC
+bfcEncrypter :: BS.ByteString -> BS.ByteString
+bfcEncrypter input = AES.encryptCbcAES128 iv consistentKey padded where
+  iv = BS.replicate 16 0
+  filtered  = BS.filter (`notElem` (BS.unpack ";=")) input
+  plaintext = "comment1=cooking%20MCs;userdata=" <> filtered <>
+              ";comment2=%20like%20a%20pound%20of%20bacon"
+  padded = CU.lpkcs7 plaintext
 
+bfcChecker :: BS.ByteString -> Bool
+bfcChecker ciphertext = target /= mempty where
+  iv          = BS.replicate 16 0
+  plaintext   = AES.decryptCbcAES128 consistentKey ciphertext
+  (_, target) = BS.breakSubstring ";admin=true;" plaintext

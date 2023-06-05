@@ -2,6 +2,7 @@ module Cryptopals.Util (
     CUB.chunks
   , CUB.hamming
   , fixedXor
+  , lpkcs7
   , CUB.nhamming
   , CUS.often
   , CUB.panhamming
@@ -41,6 +42,10 @@ pkcs7 tar bs =
   let len = BS.length bs
       byt = tar - len `mod` tar
   in  bs <> BS.replicate byt (fromIntegral byt)
+
+-- lazy man's pkcs#7 padding
+lpkcs7 :: BS.ByteString -> BS.ByteString
+lpkcs7 bs = pkcs7 (roundUpToMul 16 (BS.length bs)) bs
 
 unpkcs7 :: BS.ByteString -> Maybe BS.ByteString
 unpkcs7 bs = do
