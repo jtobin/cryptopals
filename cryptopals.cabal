@@ -30,6 +30,7 @@ library
       base
     , base16
     , base64
+    , binary
     , bytestring
     , containers
     , cryptonite

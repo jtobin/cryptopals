@@ -1,15 +1,23 @@
 module Cryptopals.AES (
     encryptCbcAES128
   , encryptEcbAES128
+
   , decryptCbcAES128
   , decryptEcbAES128
+
+  , encryptCtrAES128
+  , decryptCtrAES128
   ) where
 
-import qualified Data.ByteString as BS
-import qualified Cryptopals.Util as CU
 import qualified Crypto.Cipher.AES as CAES
 import qualified Crypto.Cipher.Types as CT
 import qualified Crypto.Error as CE
+import qualified Cryptopals.Util as CU
+import qualified Data.Binary.Get as BG
+import qualified Data.Binary.Put as BP
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BSL
+import GHC.Word (Word64)
 
 initAES128 :: BS.ByteString -> CAES.AES128
 initAES128 =  CE.throwCryptoError . CT.cipherInit
@@ -45,4 +53,21 @@ decryptCbcAES128 key ciphertext =
       in  if   BS.null bs
           then nacc
           else loop b nacc (BS.splitAt 16 bs)
+
+encryptCtrAES128 :: Word64 -> BS.ByteString -> BS.ByteString -> BS.ByteString
+encryptCtrAES128 nonce key plaintext = loop mempty 0 bs where
+  bs = CU.chunks 16 plaintext
+  iv = BS.replicate 16 0
+  no = BP.runPut (BP.putWord64le nonce)
+
+  loop !acc !ctr cs = case cs of
+    []    -> acc
+    (h:t) ->
+      let bc = BP.runPut (BP.putWord64le ctr)
+          pt = BSL.toStrict (no <> bc)
+          ks = BS.drop 16 $ encryptCbcAES128 iv key pt
+      in  loop (acc <> CU.fixedXor h ks) (ctr + 1) t
+
+decryptCtrAES128 :: Word64 -> BS.ByteString -> BS.ByteString -> BS.ByteString
+decryptCtrAES128 = encryptCtrAES128
 
