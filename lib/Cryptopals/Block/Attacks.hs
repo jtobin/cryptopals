@@ -9,12 +9,12 @@ import Control.Monad.Primitive
 import qualified Control.Monad.ST as ST
 import qualified Cryptopals.AES as AES
 import qualified Cryptopals.Util as CU
+import qualified Data.Bits as B
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Base64 as B64
 import qualified Data.HashMap.Strict as HMS
 import qualified Data.List as L
-import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import GHC.Word (Word8)
@@ -118,16 +118,16 @@ hardIncrByteEcbAttack oracle gen = do
     let input = BS.replicate (BS.length ciphertext - 1) 66
     loop input mempty gen
   where
-    loop !inp !plain gen = case BS.unsnoc inp of
+    loop !inp !plain g = case BS.unsnoc inp of
       Nothing -> pure plain
       Just (bs, _) -> do
-        raw <- oracle inp gen
+        raw <- oracle inp g
         let quer = inp <> plain
-        dict <- mciphertextMap oracle quer gen
+        dict <- mciphertextMap oracle quer g
         let key = BS.take (CU.roundUpToMul 16 (BS.length (inp <> plain))) raw
         case HMS.lookup key dict of
           Nothing  -> pure plain -- XX ?
-          Just byt -> loop bs (plain <> BS.singleton byt) gen
+          Just byt -> loop bs (plain <> BS.singleton byt) g
 
 kvParser :: T.Text -> HMS.HashMap T.Text T.Text
 kvParser = L.foldl' alg mempty . T.splitOn "&" where
@@ -191,12 +191,12 @@ attackProxy
   -> BS.ByteString
   -> MWC.Gen (PrimState m)
   -> m BS.ByteString
-attackProxy oracle input gen = loop gen where
+attackProxy oracle input = loop where
   identifier = BS.replicate 16 65
   Right knownBlock = B16.decodeBase16 "57eef2e16c3867b9889350eb5732c183"
 
   loop g = do
-    ciph <- oracle (identifier <> input) gen
+    ciph <- oracle (identifier <> input) g
     let (_, target) = BS.breakSubstring knownBlock ciph
     if   target == mempty
     then loop g
@@ -216,3 +216,75 @@ bfcChecker ciphertext = target /= mempty where
   iv          = BS.replicate 16 0
   plaintext   = AES.decryptCbcAES128 consistentKey ciphertext
   (_, target) = BS.breakSubstring ";admin=true;" plaintext
+
+-- CBC padding oracle
+
+-- see https://en.wikipedia.org/wiki/Padding_oracle_attack
+poInputs :: [BS.ByteString]
+poInputs = [
+    "MDAwMDAwTm93IHRoYXQgdGhlIHBhcnR5IGlzIGp1bXBpbmc="
+  , "MDAwMDAxV2l0aCB0aGUgYmFzcyBraWNrZWQgaW4gYW5kIHRoZSBWZWdhJ3MgYXJlIHB1bXBpbic="
+  , "MDAwMDAyUXVpY2sgdG8gdGhlIHBvaW50LCB0byB0aGUgcG9pbnQsIG5vIGZha2luZw=="
+  , "MDAwMDAzQ29va2luZyBNQydzIGxpa2UgYSBwb3VuZCBvZiBiYWNvbg=="
+  , "MDAwMDA0QnVybmluZyAnZW0sIGlmIHlvdSBhaW4ndCBxdWljayBhbmQgbmltYmxl"
+  , "MDAwMDA1SSBnbyBjcmF6eSB3aGVuIEkgaGVhciBhIGN5bWJhbA=="
+  , "MDAwMDA2QW5kIGEgaGlnaCBoYXQgd2l0aCBhIHNvdXBlZCB1cCB0ZW1wbw=="
+  , "MDAwMDA3SSdtIG9uIGEgcm9sbCwgaXQncyB0aW1lIHRvIGdvIHNvbG8="
+  , "MDAwMDA4b2xsaW4nIGluIG15IGZpdmUgcG9pbnQgb2g="
+  , "MDAwMDA5aXRoIG15IHJhZy10b3AgZG93biBzbyBteSBoYWlyIGNhbiBibG93"
+  ]
+
+paddingOracle
+  :: PrimMonad m
+  => MWC.Gen (PrimState m)
+  -> m BS.ByteString
+paddingOracle gen = do
+  idx <- MWC.uniformR (0, length poInputs - 1) gen
+  let Right input = B64.decodeBase64 (poInputs !! idx)
+      padded      = CU.lpkcs7 input
+  iv <- bytes 16 gen
+  pure $ AES.encryptCbcAES128 iv consistentKey padded
+
+poValidate :: BS.ByteString -> Bool
+poValidate bs = case CU.unpkcs7 (AES.decryptCbcAES128 consistentKey bs) of
+  Nothing -> False
+  Just _  -> True
+
+paddingOracleAttack :: BS.ByteString -> BS.ByteString
+paddingOracleAttack cip = loop mempty (reverse (CU.chunks 16 cip)) where
+  loop !acc rcs = case rcs of
+    []     -> acc
+    (h:[]) -> acc
+    (h:r@(i:t)) -> loop (poAttackBlock i h <> acc) r
+
+poAttackBlock :: BS.ByteString -> BS.ByteString -> BS.ByteString
+poAttackBlock tol tar = byte tol tar mempty mempty where
+  byte c0' c1 p1 i1 = case BS.unsnoc c0' of
+    Nothing     -> p1
+    Just (t, h) ->
+      let ncb = next t h i1 c1
+          il  = BS.length i1
+          pb  = fromIntegral il + 1
+          nib = ncb `B.xor` pb
+          npb = BS.index tol (15 - fromIntegral il) `B.xor` nib
+      in  byte t c1 (BS.cons npb p1) (BS.cons nib i1)
+
+  next bs b i1 c1 =
+    let l   = fromIntegral (BS.length i1) + 1
+        c   = BS.map (B.xor l) i1
+        c0' = BS.snoc bs b <> c
+
+        roll byt =
+          let c0' = BS.snoc bs byt <> c
+          in  if   poValidate (c0' <> c1) && cert bs (BS.cons byt c <> c1)
+              then byt
+              else roll (byt + 1)
+
+    in  roll b
+
+  cert c0' etc = case BS.unsnoc c0' of
+    Nothing -> True
+    Just (bs, b)
+      | poValidate (BS.snoc bs (b + 1) <> etc) -> True
+      | otherwise -> False
+

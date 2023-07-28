@@ -45,16 +45,18 @@ pkcs7 tar bs =
 
 -- lazy man's pkcs#7 padding
 lpkcs7 :: BS.ByteString -> BS.ByteString
-lpkcs7 bs = pkcs7 (roundUpToMul 16 (BS.length bs)) bs
+lpkcs7 bs
+  | BS.null bs = BS.replicate 16 16
+  | otherwise  = pkcs7 (roundUpToMul 16 (BS.length bs)) bs
 
 unpkcs7 :: BS.ByteString -> Maybe BS.ByteString
 unpkcs7 bs = do
   (_, c) <- BS.unsnoc bs
   let len = BS.length bs
-  if   fromIntegral c > len
+  if   fromIntegral c > len || c == 0
   then Nothing
   else let (str, pad) = BS.splitAt (len - fromIntegral c) bs
-       in  if   BS.all (== fromIntegral (BS.length pad)) pad
+       in  if   BS.all (== fromIntegral c) pad
            then pure str
            else Nothing
 
