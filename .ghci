@@ -1,8 +1,13 @@
 :set prompt "> "
 :set -XOverloadedStrings
+import qualified Data.Bits as B
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Base64 as B64
+import qualified Data.Foldable as F
+import qualified Data.List as L
+import Data.Traversable
 import qualified Data.Text.IO as TIO
 import qualified Data.Text.Encoding as TE
 import qualified Data.Text as T
