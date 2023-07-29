@@ -26,6 +26,8 @@ library
     , Cryptopals.Util
     , Cryptopals.Util.ByteString
     , Cryptopals.Util.Similarity
+    , Cryptopals.Stream.RNG
+    , Cryptopals.Stream.RNG.MT19937
   build-depends:
       base
     , base16
@@ -38,6 +40,7 @@ library
     , primitive
     , text
     , unordered-containers
+    , vector
 
 executable fixed-xor
   main-is:           FixedXor.hs
