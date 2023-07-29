@@ -1,17 +1,28 @@
 module Cryptopals.Util.Similarity (
     score
+  , scoreAlt
   , tally
+  , gtally
   , often
+  , mse
+  , mseAlt
+  , english
+  , dist
   ) where
 
 import qualified Data.ByteString as BS
+import qualified Data.Foldable as F
 import Data.Function (on)
 import qualified Data.IntMap.Strict as IMS
 import qualified Data.List as L
+import qualified Data.Map.Strict as MS
 
 -- | Distance of the encoding from expected English plaintext.
 score :: BS.ByteString -> Double
 score = mse english . dist
+
+scoreAlt :: BS.ByteString -> Maybe Double
+scoreAlt = mseAlt english . dist
 
 mse :: IMS.IntMap Double -> IMS.IntMap Double -> Double
 mse ref tar =
@@ -22,6 +33,17 @@ mse ref tar =
     alg acc key val = case IMS.lookup key tar of
       Nothing  -> acc
       Just tal -> IMS.insert key ((tal - val) ^ 2) acc
+
+mseAlt :: IMS.IntMap Double -> IMS.IntMap Double -> Maybe Double
+mseAlt ref tar = case F.foldlM alg mempty (IMS.toList tar) of
+  Nothing  -> Nothing
+  Just res -> pure $
+    let siz = IMS.size res
+    in  IMS.foldl' (\acc val -> acc + val / fromIntegral siz) 0 res
+  where
+    alg acc (key, val) = case IMS.lookup key ref of
+      Nothing  -> Nothing
+      Just tal -> pure (IMS.insert key ((tal - val) ^ 2) acc)
 
 dist :: BS.ByteString -> IMS.IntMap Double
 dist = normalize . tally
@@ -34,6 +56,12 @@ tally = BS.foldl' alg mempty where
   alg acc (fromIntegral -> byt)
     | IMS.member byt acc = IMS.adjust succ byt acc
     | otherwise          = IMS.insert byt 1 acc
+
+gtally :: Ord a => [a] -> MS.Map a Int
+gtally = L.foldl' alg mempty where
+  alg acc val
+    | MS.member val acc = MS.adjust succ val acc
+    | otherwise         = MS.insert val 1 acc
 
 normalize :: IMS.IntMap Int -> IMS.IntMap Double
 normalize m =

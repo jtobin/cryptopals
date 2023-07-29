@@ -11,8 +11,10 @@ module Cryptopals.Util (
   , CUB.rotate
   , roundUpToMul
   , CUS.score
+  , CUS.scoreAlt
   , singleByteXor
   , CUS.tally
+  , CUS.gtally
   , unpkcs7
   ) where
 
