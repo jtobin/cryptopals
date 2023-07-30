@@ -104,7 +104,7 @@ aes Args {..} = do
                 SE.exitFailure
 
               Right iv ->
-                out $ AES.decryptCbcAES128 iv k v
+                out $ AES.decryptCbcAES128 k v
 
 main :: IO ()
 main = do

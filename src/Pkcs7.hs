@@ -8,7 +8,6 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import qualified Data.Text.Encoding as TE
 import qualified Options.Applicative as O
-import qualified System.Exit as SE
 import qualified System.IO as SIO
 
 data Args = Args {
@@ -22,12 +21,9 @@ ops = Args
   <*> O.argument O.str (O.metavar "INPUT")
 
 pkcs :: Args -> IO ()
-pkcs Args {..} = case CU.pkcs7 argsPad (TE.encodeUtf8 argsInp) of
-  Nothing -> do
-    TIO.hPutStrLn SIO.stderr ("cryptopals: invalid padding target")
-    SE.exitFailure
-
-  Just b -> TIO.putStr . TE.decodeUtf8 $ b
+pkcs Args {..} = do
+  let b = CU.pkcs7 argsPad (TE.encodeUtf8 argsInp)
+  TIO.putStr . TE.decodeUtf8 $ b
 
 main :: IO ()
 main = do
