@@ -23,7 +23,7 @@ ops = Args
 mt :: Args -> IO ()
 mt Args {..} = do
   let gen        = MT.seed argsSeed
-      (bytes, _) = MT.bytes (fromIntegral argsBytes) gen
+      (bytes, _) = MT.tap (fromIntegral argsBytes) gen
 
   for_ bytes $ TIO.putStrLn . T.pack . show
 
