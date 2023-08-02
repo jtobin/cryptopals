@@ -26,6 +26,7 @@ library
     , Cryptopals.Util
     , Cryptopals.Util.ByteString
     , Cryptopals.Util.Similarity
+    , Cryptopals.Stream.Attacks
     , Cryptopals.Stream.RNG
     , Cryptopals.Stream.RNG.MT19937
   build-depends:
@@ -39,6 +40,7 @@ library
     , mwc-random
     , primitive
     , text
+    , time
     , unordered-containers
     , vector
 

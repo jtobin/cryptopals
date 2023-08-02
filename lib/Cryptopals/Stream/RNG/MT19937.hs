@@ -2,10 +2,9 @@ module Cryptopals.Stream.RNG.MT19937 (
     Gen
   , seed
   , extract
-  , bytes
+  , tap
 
-  , temper
-  , untemper
+  , clone
   ) where
 
 import qualified Control.Monad.ST as ST
@@ -48,8 +47,8 @@ data Gen = Gen !Word32 !(VU.Vector Word32)
 instance Show Gen where
   show Gen {} = "<MT19937.Gen>"
 
-bytes :: Int -> Gen -> ([Word32], Gen)
-bytes = loop mempty where
+tap :: Int -> Gen -> ([Word32], Gen)
+tap = loop mempty where
   loop !acc j gen
     | j == 0    = (reverse acc, gen)
     | otherwise =
