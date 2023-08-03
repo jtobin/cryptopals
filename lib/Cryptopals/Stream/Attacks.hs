@@ -1,17 +1,36 @@
 module Cryptopals.Stream.Attacks where
 
 import Control.Monad
+import Control.Monad.Primitive
 import qualified Control.Monad.ST as ST
 import qualified Data.Binary.Put as BP
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Base64 as B64
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Text as T
 import qualified Data.Time.Clock.System as TS
+import qualified Cryptopals.AES as AES
 import qualified Cryptopals.Stream.RNG.MT19937 as MT
 import qualified Cryptopals.Util as CU
-import GHC.Word (Word16, Word8)
+import GHC.Word (Word64, Word16, Word8)
 import qualified System.Random.MWC as MWC
+
+bytes :: PrimMonad m => Int -> MWC.Gen (PrimState m) -> m BS.ByteString
+bytes n gen = fmap BS.pack $ replicateM n (MWC.uniform gen)
+
+-- | An unknown AES key.
+consistentKey :: BS.ByteString
+consistentKey = ST.runST $ do
+  gen <- MWC.create
+  bytes 16 gen
+
+consistentNonce :: Word64
+consistentNonce = ST.runST $ do
+  gen <- MWC.create
+  MWC.uniformR (0, 0xffffffffffffffff) gen
+
+-- MT19937-related attacks
 
 keystream :: Int -> MT.Gen -> BS.ByteString
 keystream nb g =
@@ -72,3 +91,45 @@ isPwnt token = do
   let g = MT.seed s
       ks = keystream 16 g
   pure $ token == B64.encodeBase64 ks
+
+-- CTR attacks
+
+ctrEdit
+  :: BS.ByteString
+  -> BS.ByteString
+  -> Word64
+  -> Int
+  -> BS.ByteString
+  -> BS.ByteString
+ctrEdit cip key non off new =
+  let (pre, _) = BS.splitAt off cip
+      ced      = AES.encryptCtrAES128 non key new
+  in  pre <> ced
+
+rawrCtrInput :: IO BS.ByteString
+rawrCtrInput = do
+  raw <- B8.readFile "data/s4/q25_input.txt"
+  let bs = B64.decodeBase64Lenient . mconcat .B8.lines $ raw
+  let pay = AES.decryptEcbAES128 "YELLOW SUBMARINE" bs
+  pure $ AES.encryptCtrAES128 consistentNonce consistentKey pay
+
+rawrCtrOracle :: Int -> BS.ByteString -> IO BS.ByteString
+rawrCtrOracle off pay = do
+  let k = consistentKey
+      n = consistentNonce
+
+  cip <- rawrCtrInput
+
+  pure $ ctrEdit cip k n off pay
+
+rawrCtrAttack :: IO BS.ByteString
+rawrCtrAttack = do
+  cip <- rawrCtrOracle (maxBound :: Int) mempty
+  let l = BS.length cip
+      p = BS.replicate l 65
+
+  new <- rawrCtrOracle 0 p
+  let ks = new `CU.fixedXor` p
+
+  pure $ ks `CU.fixedXor` cip
+
