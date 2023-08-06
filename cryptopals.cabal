@@ -23,12 +23,14 @@ library
       Cryptopals.AES
     , Cryptopals.Block.Attacks
     , Cryptopals.Block.Tools
-    , Cryptopals.Util
-    , Cryptopals.Util.ByteString
-    , Cryptopals.Util.Similarity
+    , Cryptopals.Digest.Pure.SHA
+    , Cryptopals.MAC
     , Cryptopals.Stream.Attacks
     , Cryptopals.Stream.RNG
     , Cryptopals.Stream.RNG.MT19937
+    , Cryptopals.Util
+    , Cryptopals.Util.ByteString
+    , Cryptopals.Util.Similarity
   build-depends:
       base
     , base16
