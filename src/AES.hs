@@ -117,7 +117,7 @@ aes Args {..} = do
                 SE.exitFailure
 
               Right iv ->
-                out $ AES.decryptCbcAES128 k v
+                out $ AES.decryptCbcAES128 k (iv <> v)
 
           CTR -> case argsNonce of
             Nothing -> do

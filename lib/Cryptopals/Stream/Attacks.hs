@@ -133,3 +133,20 @@ rawrCtrAttack = do
 
   pure $ ks `CU.fixedXor` cip
 
+
+-- bitflipping CTR
+
+bfcEncrypter :: BS.ByteString -> BS.ByteString
+bfcEncrypter input = AES.encryptCtrAES128 n k padded where
+  n = consistentNonce
+  k = consistentKey
+  filtered  = BS.filter (`notElem` (BS.unpack ";=")) input
+  plaintext = "comment1=cooking%20MCs;userdata=" <> filtered <>
+              ";comment2=%20like%20a%20pound%20of%20bacon"
+  padded = CU.lpkcs7 plaintext
+
+bfcChecker :: BS.ByteString -> Bool
+bfcChecker ciphertext = target /= mempty where
+  plaintext   = AES.decryptCtrAES128 consistentNonce consistentKey ciphertext
+  (_, target) = BS.breakSubstring ";admin=true;" plaintext
+

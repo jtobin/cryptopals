@@ -205,6 +205,7 @@ attackProxy oracle input = loop where
     else pure $ BS.drop 16 target
 
 -- bitflipping CBC
+
 bfcEncrypter :: BS.ByteString -> BS.ByteString
 bfcEncrypter input = AES.encryptCbcAES128 iv consistentKey padded where
   iv = BS.replicate 16 0
@@ -358,4 +359,16 @@ rnBest s = loop (0, 1 / 0, s) 0 where
               Just sc
                 | sc < asc  -> loop (b, sc, xo) (succ b)
                 | otherwise -> loop acc (succ b)
+
+-- CBC key recovery w/IV=key
+
+bfcIvEncrypter :: BS.ByteString -> BS.ByteString
+bfcIvEncrypter input =
+    AES.encryptCbcAES128 consistentKey consistentKey padded
+  where
+    filtered  = BS.filter (`notElem` (BS.unpack ";=")) input
+    plaintext = "comment1=cooking%20MCs;userdata=" <> filtered <>
+                ";comment2=%20like%20a%20pound%20of%20bacon"
+    padded = CU.lpkcs7 plaintext
+
 
