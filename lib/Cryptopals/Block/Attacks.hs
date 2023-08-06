@@ -362,13 +362,41 @@ rnBest s = loop (0, 1 / 0, s) 0 where
 
 -- CBC key recovery w/IV=key
 
-bfcIvEncrypter :: BS.ByteString -> BS.ByteString
-bfcIvEncrypter input =
-    AES.encryptCbcAES128 consistentKey consistentKey padded
+-- Usually we include the IV with the ciphertext, but that won't fly here
+-- as it would very obviously expose the key. Instead let's omit the IV
+-- in the ciphertext:
+
+ivlEncryptCbcAES128
+  :: BS.ByteString -> BS.ByteString -> BS.ByteString
+ivlEncryptCbcAES128 key plaintext = loop key mempty (BS.splitAt 16 plaintext)
   where
-    filtered  = BS.filter (`notElem` (BS.unpack ";=")) input
-    plaintext = "comment1=cooking%20MCs;userdata=" <> filtered <>
-                ";comment2=%20like%20a%20pound%20of%20bacon"
-    padded = CU.lpkcs7 plaintext
+    loop las !acc (b, bs) =
+      let xed  = CU.fixedXor las b
+          enc  = AES.encryptEcbAES128 key xed
+          nacc = acc <> enc
+      in  if   BS.null bs
+          then nacc
+          else loop enc nacc (BS.splitAt 16 bs)
 
+ivlDecryptCbcAES128
+  :: BS.ByteString -> BS.ByteString -> BS.ByteString
+ivlDecryptCbcAES128 key ciphertext =
+    let (iv, cip) = BS.splitAt 16 (key <> ciphertext)
+    in  loop iv mempty (BS.splitAt 16 cip)
+  where
+    loop !las !acc (b, bs) =
+      let dec  = AES.decryptEcbAES128 key b
+          nacc = acc <> CU.fixedXor dec las
+          niv  = b
+      in  if   BS.null bs
+          then nacc
+          else loop b nacc (BS.splitAt 16 bs)
 
+ivlVerifier :: BS.ByteString -> Either BS.ByteString Bool
+ivlVerifier cip = loop pay where
+  pay = ivlDecryptCbcAES128 consistentKey cip
+  loop p = case BS.uncons p of
+    Nothing -> pure True
+    Just (b, bs)
+      | b > 127   -> Left pay
+      | otherwise -> loop bs
