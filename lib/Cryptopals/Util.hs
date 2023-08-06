@@ -40,10 +40,12 @@ repeatingKeyXor key pla =
   in  BS.pack $ BS.zipWith B.xor ks pla
 
 pkcs7 :: Int -> BS.ByteString -> BS.ByteString
-pkcs7 tar bs =
-  let len = BS.length bs
-      byt = tar - len `mod` tar
-  in  bs <> BS.replicate byt (fromIntegral byt)
+pkcs7 tar bs
+  | BS.length bs `rem` tar == 0 = bs <> BS.replicate 16 16
+  | otherwise =
+      let len = BS.length bs
+          byt = tar - len `mod` tar
+      in  bs <> BS.replicate byt (fromIntegral byt)
 
 -- lazy man's pkcs#7 padding
 lpkcs7 :: BS.ByteString -> BS.ByteString
