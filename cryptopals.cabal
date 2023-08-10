@@ -25,6 +25,7 @@ library
     , Cryptopals.Block.Tools
     , Cryptopals.Digest.Pure.SHA
     , Cryptopals.MAC
+    , Cryptopals.MAC.Attacks
     , Cryptopals.Stream.Attacks
     , Cryptopals.Stream.RNG
     , Cryptopals.Stream.RNG.MT19937
@@ -43,6 +44,7 @@ library
     , primitive
     , text
     , time
+    , transformers
     , unordered-containers
     , vector
 

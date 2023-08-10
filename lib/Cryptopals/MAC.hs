@@ -1,15 +1,22 @@
 module Cryptopals.MAC (
-    sha1mac
+    sha1
+  , sha1mac
+  , verifysha1mac
   ) where
 
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Char8 as B8
+import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.ByteString.Lazy as BSL
-import qualified Cryptopals.Digest.Pure.SHA as S (Digest, SHA1State, sha1)
+import qualified Cryptopals.Digest.Pure.SHA as S
 
-sha1mac :: BS.ByteString -> BS.ByteString -> BS.ByteString
-sha1mac k m = B8.pack . show . hash . BSL.fromStrict $ k <> m where
+sha1 :: BSL.ByteString -> BSL.ByteString
+sha1 = S.bytestringDigest . S.sha1
+
+sha1mac :: BSL.ByteString -> BSL.ByteString -> BSL.ByteString
+sha1mac k m = S.bytestringDigest . hash $ k <> m where
   hash :: BSL.ByteString -> S.Digest S.SHA1State
   hash = S.sha1
+
+verifysha1mac :: BSL.ByteString -> BSL.ByteString -> BSL.ByteString -> Bool
+verifysha1mac key mac message = sha1mac key message == mac
 
 

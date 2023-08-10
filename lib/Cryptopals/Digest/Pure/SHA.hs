@@ -1,4 +1,4 @@
--- NB (jtobin): this entire module is a copy-paste of
+-- NB (jtobin): this entire module is a modified copy-paste of
 --
 -- https://hackage.haskell.org/package/SHA-1.6.4.4/docs/src/Data.Digest.Pure.SHA.html
 
@@ -9,12 +9,13 @@
 module Cryptopals.Digest.Pure.SHA
        ( -- * 'Digest' and related functions
          Digest
-       , SHA1State, SHA256State, SHA512State
+       , SHA1State(..), SHA256State, SHA512State
        , showDigest
        , integerDigest
        , bytestringDigest
          -- * Calculating hashes
        , sha1
+       , sha1', sha1''
        , sha224
        , sha256
        , sha384
@@ -40,6 +41,8 @@ module Cryptopals.Digest.Pure.SHA
        , calc_k
        , padSHA1, padSHA512
        , padSHA1Chunks, padSHA512Chunks
+         -- etc (jtobin)
+       , getSHA1
        )
  where
 
@@ -78,6 +81,7 @@ instance Binary (Digest SHA512State) where
 -- --------------------------------------------------------------------------
 
 data SHA1State = SHA1S !Word32 !Word32 !Word32 !Word32 !Word32
+  deriving Show
 
 initialSHA1State :: SHA1State
 initialSHA1State = SHA1S 0x67452301 0xefcdab89 0x98badcfe 0x10325476 0xc3d2e1f0
@@ -994,6 +998,50 @@ sha1 :: ByteString -> Digest SHA1State
 sha1 bs_in = Digest bs_out
  where
   bs_pad = padSHA1 bs_in
+  fstate = runSHA initialSHA1State processSHA1Block bs_pad
+  bs_out = runPut $! synthesizeSHA1 fstate
+
+-- required padding bytes
+pbytes :: Integral a => a -> a
+pbytes ((\k -> 64 - k `mod` 64) -> l)
+  | l == 0    = l + 56
+  | otherwise = l - 8
+
+-- padding for a supplied message, using arbitrary bytelength n
+evilpadding :: Word64 -> BS.ByteString -> BS.ByteString
+evilpadding n bs = runPut $ do
+    putWord8 128
+    loop (pred (pbytes (BS.length bs)))
+  where
+    loop l
+      | l == 0    = putWord64be (n * 8)
+      | otherwise = do
+          putWord8 0
+          loop (pred l)
+
+-- sha1 with specified internal state and manual padding
+sha1'
+  :: Word32
+  -> Word32
+  -> Word32
+  -> Word32
+  -> Word32
+  -> Word64
+  -> ByteString
+  -> Digest SHA1State
+sha1' a b c d e n bs_in = Digest bs_out
+ where
+  bs_pad = bs_in <> evilpadding n bs_in
+  fstate = runSHA init processSHA1Block bs_pad
+  bs_out = runPut $! synthesizeSHA1 fstate
+  init :: SHA1State
+  init = SHA1S a b c d e
+
+-- sha1 with manual padding
+sha1'' :: Word64 -> ByteString -> Digest SHA1State
+sha1'' n bs_in = Digest bs_out
+ where
+  bs_pad = bs_in <> evilpadding n bs_in
   fstate = runSHA initialSHA1State processSHA1Block bs_pad
   bs_out = runPut $! synthesizeSHA1 fstate
 
