@@ -1,4 +1,6 @@
 .cabal-sandbox
 cabal.sandbox.config
 dist-newstyle
+node_modules
+package-lock.json
 *swp
