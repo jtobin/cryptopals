@@ -41,6 +41,7 @@ library
     , bytestring
     , containers
     , cryptonite
+    , HTTP
     , mwc-random
     , primitive
     , text

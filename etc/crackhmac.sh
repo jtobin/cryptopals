@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 
 fil=$1
-lidx=$2
-llas=$3
-lgot=$4
+
+# use these if one needs to resume a broken loop
+lidx=$2  # byte idx to start at
+llas=$3  # time the last comparison took
+lgot=$4  # MAC we've guessed thus far
 
 if [[ -z "$fil" ]]; then
   echo "no file specified. bailing out.."
@@ -12,11 +14,10 @@ fi
 
 if [[ -z "$lidx" ]]; then
   lidx=0
-  lgot=""
   llas=0.049
+  lgot=""
 fi
 
-# resume broken loop
 sup=$((39 - $lidx))
 sig="$lgot""$(printf '0%.0s' $(seq 0 $sup))"
 
@@ -54,9 +55,8 @@ for j in $(seq $lidx 2 38); do
     dif=$(echo "$tim - $las" | bc -l)
 
     if (($try == 500)); then
-      lon=$(echo "$dif > 0.05" | bc -l) # XX need more reliable condition
+      lon=$(echo "$dif > 0.05" | bc -l)
       if (( $lon == 1 )); then
-        echo "dif: $dif"
         got="$got""$byt"
         sig="$got""$etc"
         las=$tim

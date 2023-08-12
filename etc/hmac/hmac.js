@@ -50,7 +50,7 @@ const hmac_sha1 = (k, m) => {
 const verify_hmac_sha1 = (key, msg, mac) =>
   hmac_sha1(key, msg) == mac
 
-async function insecure_compare(key, msg, mac) {
+async function insecure_compare(key, msg, mac, del) {
   const bcal = Buffer.from(hmac_sha1(key, msg), 'hex')
   const bmac = Buffer.from(mac, 'hex')
 
@@ -60,7 +60,7 @@ async function insecure_compare(key, msg, mac) {
     if (bcal[idx] != bmac[idx]) {
       return false
     }
-    await new Promise(r => setTimeout(r, 50))
+    await new Promise(r => setTimeout(r, del))
   }
 
   return true

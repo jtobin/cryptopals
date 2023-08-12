@@ -3,16 +3,24 @@
 module Cryptopals.MAC.Attacks where
 
 import qualified Control.Monad.Trans.Reader as R
-import qualified Data.ByteString.Lazy as BSL
-import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.Binary.Get as BG
 import qualified Data.Binary.Put as BP
 import qualified Data.Bits as B
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.Char8 as B8
+import qualified Data.ByteString.Lazy as BSL
+import qualified Data.ByteString.Lazy.Char8 as BL8
+import qualified Data.IntMap.Strict as IMS
+import qualified Data.List as L
+import qualified Data.Text as T
+import qualified Data.Time as TI
 import qualified Cryptopals.MAC as CM
 import qualified Cryptopals.Digest.Pure.MD4 as M
 import qualified Cryptopals.Digest.Pure.SHA as S
 import GHC.Word (Word8, Word32, Word64)
+import qualified Network.HTTP as H
+import Numeric (showHex)
 import qualified System.Random.MWC as MWC
 
 data SHA1Registers = SHA1Registers !Word32 !Word32 !Word32 !Word32 !Word32
@@ -157,3 +165,69 @@ leamd4 input mac addl = loop 0 where
     k <- R.ask
     pure $ CM.verifymd4mac k mac msg
 
+-- timing attack on HMAC-SHA1
+
+hmacValidates :: BS.ByteString -> BS.ByteString -> IO Bool
+hmacValidates fil sig = do
+  let f = B8.unpack fil
+      s = T.unpack . B16.encodeBase16 $ sig
+  res <- H.simpleHTTP . H.getRequest $
+    "http://localhost:3000/hmac?safe=false&delay=5&file=" <> f <> "&" <>
+    "signature=" <> s
+  cod <- H.getResponseCode res
+  pure $ cod == (2, 0, 0)
+
+collect
+  :: BS.ByteString -- message
+  -> Int           -- number of samples
+  -> BS.ByteString -- got so far
+  -> BS.ByteString -- remaining
+  -> IO (IMS.IntMap [TI.NominalDiffTime])
+collect !fil sam pre etc = loop mempty 0 0 where
+  loop !acc cyc b
+    | cyc == sam = pure acc
+    | otherwise = do
+        let !can = pre <> BS.cons b etc
+        org <- TI.getCurrentTime
+        cod <- hmacValidates fil can
+        end <- TI.getCurrentTime
+        let dif = TI.diffUTCTime end org
+            nac = IMS.alter (add dif) (fromIntegral b) acc
+            sik | b == 255  = succ cyc
+                | otherwise = cyc
+        loop nac sik (b + 1)
+
+  add d ma = case ma of
+    Nothing -> Just (d : [])
+    Just a  -> Just (d : a)
+
+crackByte
+  :: BS.ByteString
+  -> BS.ByteString
+  -> BS.ByteString
+  -> IO Word8
+crackByte fil pre etc = do
+  samples <- collect fil 7 pre etc
+  let ver = fmap med samples
+      chu = IMS.foldlWithKey'
+              (\acc k v -> if v > snd acc then (k, v) else acc)
+              (256, 0)
+              ver
+  pure $ fromIntegral (fst chu)
+
+crackHmac :: BS.ByteString -> IO BS.ByteString
+crackHmac fil = loop mempty (BS.replicate 20 0) where
+  loop !acc sig = case BS.uncons sig of
+    Nothing     -> pure acc
+    Just (_, t) -> do
+      byt <- crackByte fil acc t
+      let nex = BS.snoc acc byt
+      putStrLn $ "current guess: " <> show (B16.encodeBase16 nex)
+      loop nex t
+
+avg :: (Foldable f, Fractional a) => f a -> a
+avg l = sum l / fromIntegral (length l)
+
+-- -- hacky median for container with known length 7
+med :: Ord a => [a] -> a
+med l = L.sort l !! 3

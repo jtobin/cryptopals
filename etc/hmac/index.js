@@ -13,15 +13,17 @@ app.get('/', (req, res) => {
 
 app.get('/hmac', async (req, res) => {
   const saf = req.query.safe
+  const del = req.query.delay
   const fil = req.query.file
   const sig = req.query.signature
 
   const msg  = Buffer.from(fil).toString('hex')
   const safe = saf == "true"
+  const wat  = parseInt(del, 10)
 
   const valid = safe
     ? hmac.verify_hmac_sha1(sec, msg, sig)
-    : await hmac.insecure_compare(sec, msg, sig)
+    : await hmac.insecure_compare(sec, msg, sig, wat)
 
   if (valid) {
     res.status(200).send({ 'HTTP': 200 })
