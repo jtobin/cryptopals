@@ -15,3 +15,5 @@ import Data.Traversable
 import qualified Data.Text.IO as TIO
 import qualified Data.Text.Encoding as TE
 import qualified Data.Text as T
+import Numeric.Natural
+import qualified System.Random.MWC as MWC
