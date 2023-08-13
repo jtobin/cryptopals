@@ -34,6 +34,7 @@ library
     , Cryptopals.Util
     , Cryptopals.Util.ByteString
     , Cryptopals.Util.Similarity
+    , Pipes.Network
   build-depends:
       base
     , base16
@@ -44,6 +45,11 @@ library
     , cryptonite
     , HTTP
     , mwc-random
+    , network
+    , network-simple
+    , pipes
+    , pipes-binary
+    , pipes-parse
     , primitive
     , text
     , time

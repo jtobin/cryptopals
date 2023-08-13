@@ -1,5 +1,6 @@
 :set prompt "> "
 :set -XOverloadedStrings
+import qualified Data.Binary as DB
 import qualified Data.Binary.Get as BG
 import qualified Data.Binary.Put as BP
 import qualified Data.Bits as B
