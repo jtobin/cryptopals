@@ -9,7 +9,6 @@ module Cryptopals.DH (
   ) where
 
 import Control.Concurrent (threadDelay)
-import Control.Monad
 import Control.Monad.Primitive
 import Control.Monad.Trans.State (StateT)
 import qualified Control.Monad.Trans.State as S
@@ -78,9 +77,6 @@ g :: Natural
 g = 2
 
 -- XX i should really put this somewhere instead of copying it every time
-bytes :: PrimMonad m => Int -> MWC.Gen (PrimState m) -> m BS.ByteString
-bytes n gen = fmap BS.pack $ replicateM n (MWC.uniform gen)
-
 -- modified from https://gist.github.com/trevordixon/6788535
 modexp :: Natural -> Natural -> Natural -> Natural
 modexp b e m
@@ -110,17 +106,28 @@ derivekey (Group p _) Keys {..} pk =
 slog :: T.Text -> T.Text -> IO ()
 slog host msg = TIO.putStrLn $ "(cryptopals) " <> host <> ": " <> msg
 
--- session eval
-seval :: T.Text -> Maybe Command -> StateT Sesh IO (Maybe Command)
-seval host = \case
+-- generic session evaluator
+geval
+  :: MonadIO m
+  => (T.Text -> Command -> m a)
+  -> T.Text
+  -> Maybe Command
+  -> m a
+geval cont host = \case
   Nothing -> liftIO $ do
     slog host "ending session"
     SE.exitSuccess
   Just cmd -> do
     liftIO $ threadDelay 1000000
-    dheval host cmd
+    cont host cmd
 
--- diffie-hellman eval
+seval :: T.Text -> Maybe Command -> StateT Sesh IO (Maybe Command)
+seval = geval dheval
+
+meval :: T.Text -> Maybe Command -> StateT Sesh IO (Maybe Command)
+meval = geval mitmeval
+
+-- diffie-hellman protocol eval
 dheval
   :: T.Text
   -> Command
@@ -154,7 +161,7 @@ dheval host = \case
         pure Nothing
       Just k -> do
         gen <- liftIO dhGen
-        iv  <- liftIO $ bytes 16 gen
+        iv  <- liftIO $ CU.bytes 16 gen
         let msg = CU.lpkcs7 "attack at 10pm"
             cip = AES.encryptCbcAES128 iv k msg
             cod = B64.encodeBase64 cip
@@ -182,7 +189,7 @@ dheval host = \case
               Just j  -> BS.drop j msg
 
         gen <- liftIO dhGen
-        iv  <- liftIO $ bytes 16 gen
+        iv  <- liftIO $ CU.bytes 16 gen
         let nmsg = CU.lpkcs7 $ "confirmed, attacking at " <> hourOfDestiny
             ncip = AES.encryptCbcAES128 iv k nmsg
             ncod = B64.encodeBase64 ncip
@@ -203,113 +210,7 @@ dheval host = \case
         liftIO $ slog host $ "decrypted ciphertext: \"" <> cod <> "\""
         pure Nothing
 
--- await key exchange
-bob :: MonadIO m => PN.ServiceName -> m a
-bob port = PN.serve "localhost" port $ \(sock, _) -> do
-  let sesh = Sesh {
-          dhGroup = Nothing
-        , dhKeys  = Nothing
-        , dhKey   = Nothing
-        , dhGen   = MWC.createSystemRandom
-        }
-  slog "bob" $ "listening.."
-  void $ S.evalStateT (runEffect (handle "bob" sock)) sesh
-
--- initiate key exchange
-alice :: PN.ServiceName -> IO ()
-alice port = PN.connect "localhost" port $ \(sock, _) -> do
-  slog "alice" $ "session established"
-
-  let grp = Group p g
-  gen <- MWC.createSystemRandom
-  per@Keys {..} <- genpair grp gen
-  slog "alice" $ "sending group parameters and public key"
-  runEffect $ do
-        PB.encode (Just (SendParams grp pub))
-    >-> PN.toSocket sock
-
-  let sesh = Sesh {
-          dhGroup = Just grp
-        , dhKeys  = Just per
-        , dhKey   = Nothing
-        , dhGen   = pure gen
-        }
-  void $ S.runStateT (runEffect (handle "alice" sock)) sesh
-
-handle host sock =
-        deco
-    >-> P.mapM eval
-    >-> for cat PB.encode
-    >-> send
-  where
-    recv = PN.fromSocket sock 4096
-    deco = PP.parsed PB.decode recv
-    send = PN.toSocket sock
-    eval = seval host
-
--- await key exchange
-mallory :: MonadIO m => PN.ServiceName -> PN.ServiceName -> m a
-mallory port bport =
-  PN.serve "localhost" port $ \(asock, _) -> do
-    slog "mallory" $ "LiSteNIng.."
-    PN.connect "localhost" bport $ \(bsock, _) -> do
-      let sesh = Sesh {
-              dhGroup = Nothing
-            , dhKeys  = Nothing
-            , dhKey   = Nothing
-            , dhGen   = MWC.createSystemRandom
-            }
-      slog "mallory" $ "eStabLisHed coNNecTion"
-      void $ S.runStateT (runEffect (dance "mallory" asock bsock)) sesh
-
-dance host asock bsock =
-        PP.parsed PB.decode recv
-    >-> P.mapM (meval host)
-    >-> for cat PB.encode
-    >-> foxtrot bsock asock
-  where
-    recv = rhumba asock bsock 4096
-
--- alternate receiving on provided sockets
-rhumba
-  :: MonadIO m
-  => N.Socket
-  -> N.Socket
-  -> Word32
-  -> Producer' BS.ByteString m ()
-rhumba a b n = loop True where
-  loop lip = do
-    let s = if lip then a else b
-    b <- liftIO (NB.recv s (fromIntegral n))
-    if   BS.null b
-    then pure ()
-    else do
-      yield b
-      loop (not lip)
-
--- alternate sending on provided sockets
-foxtrot
-  :: MonadIO m
-  => N.Socket
-  -> N.Socket
-  -> Consumer BS.ByteString m b
-foxtrot asock bsock = loop True where
-  loop lip = do
-    b <- await
-    let s = if lip then asock else bsock
-    liftIO $ PN.send s b
-    loop (not lip)
-
--- mitm eval
-meval :: T.Text -> Maybe Command -> StateT Sesh IO (Maybe Command)
-meval host = \case
-  Nothing -> liftIO $ do
-    slog host "eNDiNg sESSiOn"
-    SE.exitSuccess
-  Just cmd -> do
-    liftIO $ threadDelay 1000000
-    mitmeval host cmd
-
+-- man-in-the-middle protocol eval
 mitmeval
   :: T.Text
   -> Command
@@ -321,7 +222,7 @@ mitmeval host = \case
     let key = derivekey grp (Keys p 1) p
         nex = sesh { dhKey = Just key }
     S.put nex
-    liftIO $ slog host "sEnDinG BOguS paRaMs"
+    liftIO $ slog host "sEnDinG BOguS paRaMeTeRs"
     pure $ Just (SendParams grp p)
 
   SendPublic pk -> do
@@ -354,4 +255,103 @@ mitmeval host = \case
         liftIO $ slog host $ "DeCrYpteD cIphErteXt: \"" <> cod <> "\""
         liftIO $ slog host $ "ReLaYINg CiPHeRTexT"
         pure $ Just (SendTerminal cip)
+
+-- await key exchange
+bob :: MonadIO m => PN.ServiceName -> m a
+bob port = PN.serve "localhost" port $ \(sock, _) -> do
+  let sesh = Sesh {
+          dhGroup = Nothing
+        , dhKeys  = Nothing
+        , dhKey   = Nothing
+        , dhGen   = MWC.createSystemRandom
+        }
+  slog "bob" $ "listening.."
+  void $ S.evalStateT (runEffect (session "bob" sock)) sesh
+
+-- initiate key exchange
+alice :: PN.ServiceName -> IO ()
+alice port = PN.connect "localhost" port $ \(sock, _) -> do
+  slog "alice" $ "session established"
+
+  let grp = Group p g
+  gen <- MWC.createSystemRandom
+  per@Keys {..} <- genpair grp gen
+  slog "alice" $ "sending group parameters and public key"
+  runEffect $ do
+        PB.encode (Just (SendParams grp pub))
+    >-> PN.toSocket sock
+
+  let sesh = Sesh {
+          dhGroup = Just grp
+        , dhKeys  = Just per
+        , dhKey   = Nothing
+        , dhGen   = pure gen
+        }
+  void $ S.runStateT (runEffect (session "alice" sock)) sesh
+
+-- await key exchange
+mallory :: MonadIO m => PN.ServiceName -> PN.ServiceName -> m a
+mallory port bport =
+  PN.serve "localhost" port $ \(asock, _) -> do
+    slog "mallory" $ "LiSteNIng.."
+    PN.connect "localhost" bport $ \(bsock, _) -> do
+      let sesh = Sesh {
+              dhGroup = Nothing
+            , dhKeys  = Nothing
+            , dhKey   = Nothing
+            , dhGen   = MWC.createSystemRandom
+            }
+      slog "mallory" $ "eStabLisHed coNNecTion"
+      void $ S.runStateT (runEffect (dance "mallory" asock bsock)) sesh
+
+-- basic TCP coordination
+session host sock =
+        deco
+    >-> P.mapM eval
+    >-> for cat PB.encode
+    >-> send
+  where
+    recv = PN.fromSocket sock 4096
+    deco = PP.parsed PB.decode recv
+    send = PN.toSocket sock
+    eval = seval host
+
+-- MITM TCP coordination
+dance host asock bsock =
+        PP.parsed PB.decode recv
+    >-> P.mapM (meval host)
+    >-> for cat PB.encode
+    >-> foxtrot bsock asock
+  where
+    recv = rhumba asock bsock 4096
+
+-- receive on alternate sockets
+rhumba
+  :: MonadIO m
+  => N.Socket
+  -> N.Socket
+  -> Word32
+  -> Producer' BS.ByteString m ()
+rhumba a b n = loop True where
+  loop lip = do
+    let s = if lip then a else b
+    b <- liftIO (NB.recv s (fromIntegral n))
+    if   BS.null b
+    then pure ()
+    else do
+      yield b
+      loop (not lip)
+
+-- send on alternate sockets
+foxtrot
+  :: MonadIO m
+  => N.Socket
+  -> N.Socket
+  -> Consumer BS.ByteString m b
+foxtrot asock bsock = loop True where
+  loop lip = do
+    b <- await
+    let s = if lip then asock else bsock
+    liftIO $ PN.send s b
+    loop (not lip)
 

@@ -16,14 +16,11 @@ import qualified Cryptopals.Util as CU
 import GHC.Word (Word64, Word16, Word8)
 import qualified System.Random.MWC as MWC
 
-bytes :: PrimMonad m => Int -> MWC.Gen (PrimState m) -> m BS.ByteString
-bytes n gen = fmap BS.pack $ replicateM n (MWC.uniform gen)
-
 -- | An unknown AES key.
 consistentKey :: BS.ByteString
 consistentKey = ST.runST $ do
   gen <- MWC.create
-  bytes 16 gen
+  CU.bytes 16 gen
 
 consistentNonce :: Word64
 consistentNonce = ST.runST $ do

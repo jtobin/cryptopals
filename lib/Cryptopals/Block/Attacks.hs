@@ -22,14 +22,11 @@ import qualified Data.Text.Encoding as TE
 import GHC.Word (Word8)
 import qualified System.Random.MWC as MWC
 
-bytes :: PrimMonad m => Int -> MWC.Gen (PrimState m) -> m BS.ByteString
-bytes n gen = fmap BS.pack $ replicateM n (MWC.uniform gen)
-
 -- | An unknown AES key.
 consistentKey :: BS.ByteString
 consistentKey = ST.runST $ do
   gen <- MWC.create
-  bytes 16 gen
+  CU.bytes 16 gen
 
 chaosEncrypter
   :: PrimMonad m
@@ -37,9 +34,9 @@ chaosEncrypter
   -> MWC.Gen (PrimState m)
   -> m BS.ByteString
 chaosEncrypter plaintext gen = do
-  key  <- bytes 16 gen
-  pre  <- MWC.uniformR (5, 10) gen >>= flip bytes gen
-  pos  <- MWC.uniformR (5, 10) gen >>= flip bytes gen
+  key  <- CU.bytes 16 gen
+  pre  <- MWC.uniformR (5, 10) gen >>= flip CU.bytes gen
+  pos  <- MWC.uniformR (5, 10) gen >>= flip CU.bytes gen
 
   let tex = pre <> plaintext <> pos
       bs  = CU.lpkcs7 tex
@@ -49,7 +46,7 @@ chaosEncrypter plaintext gen = do
   if   ecb
   then pure $ AES.encryptEcbAES128 key bs
   else do
-    iv <- bytes 16 gen
+    iv <- CU.bytes 16 gen
     pure $ AES.encryptCbcAES128 iv key bs
 
 alienEncrypter :: BS.ByteString -> BS.ByteString
@@ -169,7 +166,7 @@ weirdEncrypter plaintext gen = do
         ]
 
   bys <- MWC.uniformR (1, 256) gen
-  pre <- bytes bys gen
+  pre <- CU.bytes bys gen
 
   let par = pre <> plaintext <> pos
       bs  = CU.lpkcs7 par
@@ -245,7 +242,7 @@ paddingOracle gen = do
   idx <- MWC.uniformR (0, length poInputs - 1) gen
   let Right input = B64.decodeBase64 (poInputs !! idx)
       padded      = CU.lpkcs7 input
-  iv <- bytes 16 gen
+  iv <- CU.bytes 16 gen
   pure $ AES.encryptCbcAES128 iv consistentKey padded
 
 poValidate :: BS.ByteString -> Bool

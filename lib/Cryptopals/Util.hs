@@ -16,8 +16,11 @@ module Cryptopals.Util (
   , CUS.tally
   , CUS.gtally
   , unpkcs7
+  , bytes
   ) where
 
+import Control.Monad
+import Control.Monad.Primitive
 import qualified Cryptopals.Util.ByteString as CUB
 import qualified Cryptopals.Util.Similarity as CUS
 import qualified Data.Bits as B
@@ -26,6 +29,10 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Base64 as B64
 import qualified Data.Text as T
 import GHC.Word (Word8)
+import qualified System.Random.MWC as MWC
+
+bytes :: PrimMonad m => Int -> MWC.Gen (PrimState m) -> m BS.ByteString
+bytes n gen = fmap BS.pack $ replicateM n (MWC.uniform gen)
 
 fixedXor :: BS.ByteString -> BS.ByteString -> BS.ByteString
 fixedXor l r = BS.pack $ BS.zipWith B.xor l r
