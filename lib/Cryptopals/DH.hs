@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Cryptopals.DH (
@@ -33,6 +34,7 @@ import qualified Data.Text.IO as TIO
 import GHC.Generics (Generic)
 import GHC.Word (Word16)
 import qualified Network.Simple.TCP as N
+import qualified Network.Socket.ByteString as NB
 import Numeric.Natural
 import Pipes
 import qualified Pipes.Binary as PB
@@ -211,7 +213,7 @@ bob port = PN.serve "localhost" port $ \(sock, _) -> do
         , dhGen   = MWC.createSystemRandom
         }
   slog "bob" $ "listening.."
-  void $ S.runStateT (runEffect (handle "bob" sock)) sesh
+  void $ S.evalStateT (runEffect (handle "bob" sock)) sesh
 
 -- initiate key exchange
 alice :: PN.ServiceName -> IO ()
@@ -244,4 +246,112 @@ handle host sock =
     deco = PP.parsed PB.decode recv
     send = PN.toSocket sock
     eval = seval host
+
+-- await key exchange
+mallory :: MonadIO m => PN.ServiceName -> PN.ServiceName -> m a
+mallory port bport =
+  PN.serve "localhost" port $ \(asock, _) -> do
+    slog "mallory" $ "LiSteNIng.."
+    PN.connect "localhost" bport $ \(bsock, _) -> do
+      let sesh = Sesh {
+              dhGroup = Nothing
+            , dhKeys  = Nothing
+            , dhKey   = Nothing
+            , dhGen   = MWC.createSystemRandom
+            }
+      slog "mallory" $ "eStabLisHed coNNecTion"
+      void $ S.runStateT (runEffect (dance "mallory" asock bsock)) sesh
+
+dance host asock bsock =
+        PP.parsed PB.decode recv
+    >-> P.mapM (meval host)
+    >-> for cat PB.encode
+    >-> foxtrot bsock asock
+  where
+    recv = rhumba asock bsock 4096
+
+-- alternate receiving on provided sockets
+rhumba
+  :: MonadIO m
+  => N.Socket
+  -> N.Socket
+  -> Word32
+  -> Producer' BS.ByteString m ()
+rhumba a b n = loop True where
+  loop lip = do
+    let s = if lip then a else b
+    b <- liftIO (NB.recv s (fromIntegral n))
+    if   BS.null b
+    then pure ()
+    else do
+      yield b
+      loop (not lip)
+
+-- alternate sending on provided sockets
+foxtrot
+  :: MonadIO m
+  => N.Socket
+  -> N.Socket
+  -> Consumer BS.ByteString m b
+foxtrot asock bsock = loop True where
+  loop lip = do
+    b <- await
+    let s = if lip then asock else bsock
+    liftIO $ PN.send s b
+    loop (not lip)
+
+-- mitm eval
+meval :: T.Text -> Maybe Command -> StateT Sesh IO (Maybe Command)
+meval host = \case
+  Nothing -> liftIO $ do
+    slog host "eNDiNg sESSiOn"
+    SE.exitSuccess
+  Just cmd -> do
+    liftIO $ threadDelay 1000000
+    mitmeval host cmd
+
+mitmeval
+  :: T.Text
+  -> Command
+  -> StateT Sesh IO (Maybe Command)
+mitmeval host = \case
+  SendParams grp pk -> do
+    sesh@Sesh {..} <- S.get
+    liftIO $ slog host "reCEiVed GRoUp pArAmeTErs And pUBliC kEy"
+    let key = derivekey grp (Keys p 1) p
+        nex = sesh { dhKey = Just key }
+    S.put nex
+    liftIO $ slog host "sEnDinG BOguS paRaMs"
+    pure $ Just (SendParams grp p)
+
+  SendPublic pk -> do
+    liftIO $ slog host "REceIvED pUBlic keY"
+    liftIO $ slog host "seNDINg boGus kEy"
+    pure $ Just (SendPublic p)
+
+  SendMessage cip -> do
+    sesh@Sesh {..} <- S.get
+    let cod = B64.encodeBase64 cip
+    liftIO $ slog host $ "rECeIveD CiPHeRTexT " <> cod
+    case dhKey of
+      Nothing -> error "mallory knows key"
+      Just k -> do
+        let Just msg = CU.unpkcs7 (AES.decryptCbcAES128 k cip)
+            cod = TE.decodeLatin1 msg
+        liftIO $ slog host $ "DEcRyptEd cIPheRTeXt: \"" <> cod <> "\""
+        liftIO $ slog host $ "reLayINg cIpheRtExt"
+        pure $ Just (SendMessage cip)
+
+  SendTerminal cip -> do
+    sesh@Sesh {..} <- S.get
+    let cod = B64.encodeBase64 cip
+    liftIO $ slog host $ "reCeiVeD CipHeRtExt " <> cod
+    case dhKey of
+      Nothing -> error "mallory knows key"
+      Just k -> do
+        let Just msg = CU.unpkcs7 (AES.decryptCbcAES128 k cip)
+            cod = TE.decodeLatin1 msg
+        liftIO $ slog host $ "DeCrYpteD cIphErteXt: \"" <> cod <> "\""
+        liftIO $ slog host $ "ReLaYINg CiPHeRTexT"
+        pure $ Just (SendTerminal cip)
 
