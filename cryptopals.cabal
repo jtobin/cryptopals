@@ -24,6 +24,8 @@ library
     , Cryptopals.Block.Attacks
     , Cryptopals.Block.Tools
     , Cryptopals.DH
+    , Cryptopals.DH.Core
+    , Cryptopals.DH.Session
     , Cryptopals.Digest.Pure.MD4
     , Cryptopals.Digest.Pure.SHA
     , Cryptopals.MAC
