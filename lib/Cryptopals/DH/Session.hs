@@ -3,13 +3,22 @@
 
 module Cryptopals.DH.Session (
     Command(..)
+  , genGroup
+  , genKeypair
+
+
   , Sesh(..)
-  , Handler
+  , Protocol
 
   , blog
   , slog
-  , beval
-  , meval
+
+  , dh
+  , dhng
+
+  , dhmitm
+  , dhngmitm
+  , dhngmitm'
 
   , session
   , dance
@@ -22,9 +31,12 @@ import Control.Monad.Trans.State (StateT)
 import qualified Control.Monad.Trans.State as S
 import qualified Cryptopals.AES as AES
 import Cryptopals.DH.Core
+import qualified Cryptopals.Digest.Pure.SHA as CS
 import qualified Cryptopals.Util as CU
 import qualified Data.Binary as DB
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Base64 as B64
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.Char as C
@@ -54,13 +66,13 @@ data Command =
 
 instance DB.Binary Command
 
-type Handler m b c = b -> m c
+type Protocol m b c = b -> m c
 
 -- session state
 data Sesh = Sesh {
     dhGroup       :: Maybe Group
   , dhHost        :: T.Text
-  -- , dhSock        :: PN.Socket     -- XX add me
+  , dhSock        :: PN.Socket
   , dhKeys        :: Maybe Keys
   , dhKey         :: Maybe BS.ByteString
   , dhGen         :: IO (MWC.Gen RealWorld)
@@ -75,12 +87,17 @@ slog :: T.Text -> StateT Sesh IO ()
 slog msg = do
   host <- S.gets dhHost
   liftIO $ TIO.putStrLn $ "(cryptopals) " <> host <> ": " <> msg
+  liftIO suspense
+
+-- dramatic effect
+suspense :: IO ()
+suspense = threadDelay 1000000
 
 -- basic TCP coordination
 session
   :: (MonadIO m, DB.Binary b, DB.Binary c)
   => PN.Socket
-  -> Handler m b c
+  -> Protocol m b c
   -> Effect m (PB.DecodingError, Producer BS.ByteString m ())
 session sock eval =
         deco
@@ -97,7 +114,7 @@ dance
   :: (MonadIO m, DB.Binary b, DB.Binary c)
   => PN.Socket
   -> PN.Socket
-  -> Handler m b c
+  -> Protocol m b c
   -> Effect m (PB.DecodingError, Producer BS.ByteString m ())
 dance asock bsock eval =
         PP.parsed PB.decode recv
@@ -117,22 +134,28 @@ seval cont = \case
     slog "ending session"
     liftIO $ SE.exitSuccess -- XX should really just close the socket
   Just cmd -> do
-    liftIO $ threadDelay 3000000
+    liftIO suspense
     cont cmd
 
 -- basic dh evaluation
-beval :: Maybe Command -> StateT Sesh IO (Maybe Command)
-beval = seval dheval
+dh :: Protocol (StateT Sesh IO) (Maybe Command) (Maybe Command)
+dh = seval dheval
 
 -- mitm dh evaluation
-meval :: Maybe Command -> StateT Sesh IO (Maybe Command)
-meval = seval mitmeval
+dhmitm :: Protocol (StateT Sesh IO) (Maybe Command) (Maybe Command)
+dhmitm = seval mitmeval
 
 -- negotiated-group dh evaluation
-geval :: Maybe Command -> StateT Sesh IO (Maybe Command)
-geval = seval ngeval
+dhng :: Protocol (StateT Sesh IO) (Maybe Command) (Maybe Command)
+dhng = seval ngeval
 
--- XX refactor some common actions, e.g. assembling ciphertexts
+-- mitm negotiated-group dh evaluation
+dhngmitm :: Natural -> Protocol (StateT Sesh IO) (Maybe Command) (Maybe Command)
+dhngmitm = seval . malgeval
+
+-- mitm negotiated-group dh evaluation, g = p - 1
+dhngmitm' :: Protocol (StateT Sesh IO) (Maybe Command) (Maybe Command)
+dhngmitm' = seval malgeval'
 
 -- diffie-hellman protocol eval
 dheval
@@ -148,81 +171,37 @@ dheval = \case
     pure Nothing
 
   SendParams grp pk -> do
-    sesh@Sesh {..} <- S.get
-    slog "received group parameters and public key"
-    gen <- liftIO dhGen
-    per@Keys {..} <- liftIO $ genpair grp gen
-    let key = derivekey grp per pk
-        nex = sesh {
-                  dhGroup = Just grp
-                , dhKeys  = Just per
-                , dhKey   = Just key
-                }
-    S.put nex
-    slog "sending public key"
+    slog $ "received group parameters and public key " <> renderkey pk
+    S.modify (\sesh -> sesh { dhGroup = Just grp })
+    Keys {..} <- genKeypair
+    deriveKey pk
+    slog $ "sending public key " <> renderkey pk
     pure $ Just (SendPublic pub)
 
   SendPublic pk -> do
+    slog $ "received public key " <> renderkey pk
     sesh@Sesh {..} <- S.get
-    slog "received public key"
-    let key = do
-          per@Keys {..} <- dhKeys
-          grp <- dhGroup
-          pure $ derivekey grp per pk
-    case key of
-      Nothing -> do
-        slog "key derivation failed"
-        pure Nothing
-      Just k -> do
-        gen <- liftIO dhGen
-        iv  <- liftIO $ CU.bytes 16 gen
-        let msg = CU.lpkcs7 "attack at 10pm"
-            cip = AES.encryptCbcAES128 iv k msg
-            cod = B64.encodeBase64 cip
-        slog $ "sending ciphertext " <> cod
-        let rep = Just (SendMessage cip)
-            nex = sesh { dhKey = key }
-        S.put nex
-        pure rep
+    k <- deriveKey pk
+    cip <- encrypt "attack at 10pm"
+    S.put sesh { dhKey = Just k }
+    slog $ "sending ciphertext " <> B64.encodeBase64 cip
+    pure $ Just (SendMessage cip)
 
   SendMessage cip -> do
+    slog $ "received ciphertext " <> B64.encodeBase64 cip
     sesh@Sesh {..} <- S.get
-    let cod = B64.encodeBase64 cip
-    slog $ "received ciphertext " <> cod
-    case dhKey of
-      Nothing -> do
-        slog "shared key not established"
-        pure Nothing
-      Just k -> do
-        let Just msg = CU.unpkcs7 (AES.decryptCbcAES128 k cip)
-            cod = TE.decodeLatin1 msg
-        slog $ "decrypted ciphertext: \"" <> cod <> "\""
-
-        let hourOfDestiny = case B8.findIndex C.isDigit msg of
-              Nothing -> error "did i fat-finger a digit?"
-              Just j  -> BS.drop j msg
-
-        gen <- liftIO dhGen
-        iv  <- liftIO $ CU.bytes 16 gen
-        let nmsg = CU.lpkcs7 $ "confirmed, attacking at " <> hourOfDestiny
-            ncip = AES.encryptCbcAES128 iv k nmsg
-            ncod = B64.encodeBase64 ncip
-        slog $ "replying with ciphertext " <> ncod
-        pure $ Just (SendTerminal ncip)
+    msg <- decrypt cip
+    slog $ "decrypted ciphertext: \"" <> TE.decodeLatin1 msg <> "\""
+    ncip <- encrypt $ "confirmed, attacking at 10pm"
+    slog $ "replying with ciphertext " <> B64.encodeBase64 ncip
+    pure $ Just (SendTerminal ncip)
 
   SendTerminal cip -> do
+    slog $ "received ciphertext " <> B64.encodeBase64 cip
     sesh@Sesh {..} <- S.get
-    let cod = B64.encodeBase64 cip
-    slog $ "received ciphertext " <> cod
-    case dhKey of
-      Nothing -> do
-        slog "shared key not established"
-        pure Nothing
-      Just k -> do
-        let Just msg = CU.unpkcs7 (AES.decryptCbcAES128 k cip)
-            cod = TE.decodeLatin1 msg
-        slog $ "decrypted ciphertext: \"" <> cod <> "\""
-        pure Nothing
+    msg <- decrypt cip
+    slog $ "decrypted ciphertext: \"" <> TE.decodeLatin1 msg <> "\""
+    pure Nothing
 
 -- man-in-the-middle protocol eval
 mitmeval
@@ -230,44 +209,38 @@ mitmeval
   -> StateT Sesh IO (Maybe Command)
 mitmeval = \case
   SendParams grp pk -> do
+    slog $ "reCEiVed GRoUp pArAmeTErs And pUBliC kEy " <> renderkey pk
     sesh@Sesh {..} <- S.get
-    slog "reCEiVed GRoUp pArAmeTErs And pUBliC kEy"
     let key = derivekey grp (Keys p 1) p
         nex = sesh { dhKey = Just key }
     S.put nex
-    slog "sEnDinG BOguS paRaMeTeRs"
+    slog $ "sEnDinG BOguS paRaMeTeRs wIth PuBLiC kEy " <> renderkey p
     pure $ Just (SendParams grp p)
 
   SendPublic pk -> do
-    slog "REceIvED pUBlic keY"
-    slog "seNDINg boGus kEy"
+    slog $ "REceIvED pUBlic keY " <> renderkey pk
+    slog $ "seNDINg boGus kEy " <> renderkey p
     pure $ Just (SendPublic p)
 
   SendMessage cip -> do
+    slog $ "rECeIveD CiPHeRTexT " <> B64.encodeBase64 cip
     sesh@Sesh {..} <- S.get
-    let cod = B64.encodeBase64 cip
-    slog $ "rECeIveD CiPHeRTexT " <> cod
-    case dhKey of
-      Nothing -> error "mallory knows key"
-      Just k -> do
-        let Just msg = CU.unpkcs7 (AES.decryptCbcAES128 k cip)
-            cod = TE.decodeLatin1 msg
-        slog $ "DEcRyptEd cIPheRTeXt: \"" <> cod <> "\""
-        slog "reLayINg cIpheRtExt"
-        pure $ Just (SendMessage cip)
+    msg <- decrypt cip
+    slog $ "DEcRyptEd cIPheRTeXt: \"" <> TE.decodeLatin1 msg <> "\""
+    slog "reLayINg cIpheRtExt"
+    pure $ Just (SendMessage cip)
 
   SendTerminal cip -> do
+    slog $ "reCeiVeD CipHeRtExt " <> B64.encodeBase64 cip
     sesh@Sesh {..} <- S.get
-    let cod = B64.encodeBase64 cip
-    slog $ "reCeiVeD CipHeRtExt " <> cod
-    case dhKey of
-      Nothing -> error "mallory knows key"
-      Just k -> do
-        let Just msg = CU.unpkcs7 (AES.decryptCbcAES128 k cip)
-            cod = TE.decodeLatin1 msg
-        slog $ "DeCrYpteD cIphErteXt: \"" <> cod <> "\""
-        slog "ReLaYINg CiPHeRTexT"
-        pure $ Just (SendTerminal cip)
+    msg <- decrypt cip
+    slog $ "DeCrYpteD cIphErteXt: \"" <> TE.decodeLatin1 msg <> "\""
+    slog "ReLaYINg CiPHeRTexT"
+    pure $ Just (SendTerminal cip)
+
+  cmd -> do
+    slog "RelAyInG coMmaNd"
+    pure (Just cmd)
 
 -- negotiated-group protocol eval
 ngeval
@@ -275,95 +248,178 @@ ngeval
   -> StateT Sesh IO (Maybe Command)
 ngeval = \case
   SendGroup grp -> do
-    sesh@Sesh {..} <- S.get
     slog "received group parameters"
-    let nex = sesh { dhGroup = Just grp }
-    S.put nex
-    slog "ACK"
+    sesh@Sesh {..} <- S.get
+    S.put sesh { dhGroup = Just grp }
+    slog "acking group parameters"
     pure (Just AckGroup)
 
   AckGroup -> do
+    slog "received ack"
     sesh@Sesh {..} <- S.get
-    slog "ACK ACK"
-    gen <- liftIO dhGen
-    case dhGroup of
-      Nothing -> do
-        slog "haven't generated group yet"
-        pure Nothing
-      Just grp -> do
-        per@Keys {..} <- liftIO $ genpair grp gen
-        let nex = sesh { dhKeys = Just per }
-        S.put nex
-        slog "sending public key"
-        pure $ Just (SendPublic pub)
+    Keys {..} <- genKeypair
+    slog $ "sending public key " <> renderkey pub
+    pure $ Just (SendPublic pub)
 
-  SendParams grp pk -> do
+  SendParams {} -> do
     slog "not expecting group parameters and public key"
     pure Nothing
 
   SendPublic pk -> do
+    slog $ "received public key " <> renderkey pk
     sesh@Sesh {..} <- S.get
-    slog "received public key"
-    case dhGroup of
+    case dhKeys of
       Nothing -> do
-        slog "don't have group parameters"
-        pure Nothing
-      Just grp -> case dhKeys of
+        Keys {..} <- genKeypair
+        key <- deriveKey pk
+        slog "sending public key"
+        pure (Just (SendPublic pub))
+      Just Keys {..} -> do
+        key <- deriveKey pk
+        cip <- encrypt "attack at 10pm"
+        slog $ "sending ciphertext " <> B64.encodeBase64 cip
+        pure (Just (SendMessage cip))
+
+  cmd -> dheval cmd
+
+-- negotiated-group mitm protocol eval
+malgeval
+  :: Natural
+  -> Command
+  -> StateT Sesh IO (Maybe Command)
+malgeval malg = \case
+  SendGroup grp -> do
+    slog "reCEiVed GRoUp pArAmeTErs"
+    sesh <- S.get
+    let key = derivekey grp (Keys p malg) malg
+    S.put sesh {
+        dhGroup = Just grp
+      , dhKey   = Just key
+      }
+    let malgrp = Group p malg
+    slog "sEnDinG BOguS GRoUp paRaMeTeRs"
+    pure $ Just (SendGroup malgrp)
+
+  AckGroup -> do
+    slog "rECeiVed aCK"
+    slog "ReLaYINg ACk"
+    pure (Just AckGroup)
+
+  SendParams grp pk -> do
+    slog "nOt eXPecTinG gRoUp and PublIc KeY"
+    pure Nothing
+
+  -- only want to send bogus key on the first time
+  SendPublic pk -> do
+    slog $ "REceIvED pUBlic keY " <> renderkey pk
+    slog $ "SeNDing BoGuS kEy " <> renderkey malg
+    pure $ Just (SendPublic malg)
+
+  cmd -> mitmeval cmd
+
+-- negotiated-group mitm protocol eval, g = p - 1
+malgeval'
+  :: Command
+  -> StateT Sesh IO (Maybe Command)
+malgeval' = \case
+  AckGroup -> do
+    slog "rECeiVed aCK"
+    slog "ReLaYINg ACk"
+    pure (Just AckGroup)
+
+  SendParams grp pk -> do
+    slog "nOt eXPecTinG gRoUp and PublIc KeY"
+    pure Nothing
+
+  SendPublic pk -> do
+    slog $ "REceIvED pUBlic keY " <> renderkey pk
+    sesh@Sesh {..} <- S.get
+    case dhKeys of
+      Nothing -> do
+        S.put sesh {
+            dhKeys = Just (Keys 1 1)
+          }
+        slog $ "SeNDing BoGuS kEy " <> renderkey 1
+        pure $ Just (SendPublic 1)
+      Just Keys {..} -> do
+        slog $ "ReLAyINg pUbliC KeY " <> renderkey pk
+        pure $ Just (SendPublic pk)
+
+  cmd -> malgeval (p - 1) cmd
+
+genGroup :: Natural -> Natural -> StateT Sesh IO Group
+genGroup p g = do
+  sesh <- S.get
+  let grp = Group p g
+  S.put sesh {
+      dhGroup = Just grp
+    }
+  pure grp
+
+genKeypair :: StateT Sesh IO Keys
+genKeypair = do
+  sesh@Sesh {..} <- S.get
+  case dhGroup of
+    Nothing -> do
+      slog "missing group parameters"
+      liftIO SE.exitFailure
+    Just grp -> do
+      gen <- liftIO dhGen
+      per <- liftIO $ genpair grp gen
+      S.put sesh {
+          dhKeys = Just per
+        }
+      pure per
+
+deriveKey :: Natural -> StateT Sesh IO BS.ByteString
+deriveKey pk = do
+  sesh@Sesh {..} <- S.get
+  let params = do
+        grp <- dhGroup
+        per <- dhKeys
+        pure (grp, per)
+  case params of
+    Nothing -> do
+      slog "missing group parameters or keypair"
+      liftIO SE.exitFailure
+    Just (grp, per) -> do
+      let key = derivekey grp per pk
+      S.put sesh {
+          dhKey = Just key
+        }
+      pure key
+
+encrypt :: BS.ByteString -> StateT Sesh IO BS.ByteString
+encrypt msg = do
+  sesh@Sesh {..} <- S.get
+  case dhKey of
+    Nothing -> do
+      slog "missing shared key"
+      liftIO SE.exitFailure
+    Just k -> do
+      gen <- liftIO dhGen
+      iv <- liftIO $ CU.bytes 16 gen
+      let pad = CU.lpkcs7 msg
+      pure $ AES.encryptCbcAES128 iv k pad
+
+decrypt :: BS.ByteString -> StateT Sesh IO BS.ByteString
+decrypt cip = do
+  sesh@Sesh {..} <- S.get
+  case dhKey of
+    Nothing -> do
+      slog "missing shared key"
+      liftIO SE.exitFailure
+    Just k -> do
+      case CU.unpkcs7 (AES.decryptCbcAES128 k cip) of
         Nothing -> do
-          gen <- liftIO dhGen
-          per@Keys {..} <- liftIO $ genpair grp gen
-          let nex = sesh { dhKeys = Just per }
-          S.put nex
-          slog "sending public key"
-          pure (Just (SendPublic pub))
-        Just per@Keys {..} -> do
-          let key = derivekey grp per pk
-              nex = sesh { dhKey = Just key }
-          S.put nex
-          gen <- liftIO dhGen
-          iv  <- liftIO $ CU.bytes 16 gen
-          let msg = CU.lpkcs7 "attack at 10pm"
-              cip = AES.encryptCbcAES128 iv key msg
-              cod = B64.encodeBase64 cip
-          slog $ "sending ciphertext " <> cod
-          pure $ Just (SendMessage cip)
+          slog "couldn't decrypt ciphertext"
+          liftIO SE.exitFailure
+        Just msg -> pure msg
 
-  SendMessage cip -> do
-    sesh@Sesh {..} <- S.get
-    let cod = B64.encodeBase64 cip
-    slog $ "received ciphertext " <> cod
-    case dhKey of
-      Nothing -> do
-        slog "shared key not established"
-        pure Nothing
-      Just k -> do
-        let Just msg = CU.unpkcs7 (AES.decryptCbcAES128 k cip)
-            cod = TE.decodeLatin1 msg
-        slog $ "decrypted ciphertext: \"" <> cod <> "\""
-
-        let hourOfDestiny = case B8.findIndex C.isDigit msg of
-              Nothing -> error "did i fat-finger a digit?"
-              Just j  -> BS.drop j msg
-
-        gen <- liftIO dhGen
-        iv  <- liftIO $ CU.bytes 16 gen
-        let nmsg = CU.lpkcs7 $ "confirmed, attacking at " <> hourOfDestiny
-            ncip = AES.encryptCbcAES128 iv k nmsg
-            ncod = B64.encodeBase64 ncip
-        slog $ "replying with ciphertext " <> ncod
-        pure $ Just (SendTerminal ncip)
-
-  SendTerminal cip -> do
-    sesh@Sesh {..} <- S.get
-    let cod = B64.encodeBase64 cip
-    slog $ "received ciphertext " <> cod
-    case dhKey of
-      Nothing -> do
-        slog "shared key not established"
-        pure Nothing
-      Just k -> do
-        let Just msg = CU.unpkcs7 (AES.decryptCbcAES128 k cip)
-            cod = TE.decodeLatin1 msg
-        slog $ "decrypted ciphertext: \"" <> cod <> "\""
-        pure Nothing
-
+renderkey :: Natural -> T.Text
+renderkey =
+    B16.encodeBase16
+  . BL.toStrict
+  . CS.bytestringDigest
+  . CS.sha1
+  . DB.encode

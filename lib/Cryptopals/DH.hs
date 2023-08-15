@@ -25,17 +25,11 @@ import qualified System.Random.MWC as MWC
 bob
   :: (DB.Binary b, DB.Binary c)
   => PN.ServiceName
-  -> Handler (StateT Sesh IO) b c
+  -> Protocol (StateT Sesh IO) b c
   -> IO ()
 bob port eval = PN.serve "localhost" port $ \(sock, _) -> do
   let host = "bob"
-      sesh = Sesh {
-          dhGroup = Nothing
-        , dhHost  = host
-        , dhKeys  = Nothing
-        , dhKey   = Nothing
-        , dhGen   = MWC.createSystemRandom
-        }
+      sesh = open sock host
   blog host "listening.."
   void $ S.evalStateT (runEffect (session sock eval)) sesh
 
@@ -43,48 +37,58 @@ bob port eval = PN.serve "localhost" port $ \(sock, _) -> do
 alice
   :: (DB.Binary b, DB.Binary c)
   => PN.ServiceName
-  -> Handler (StateT Sesh IO) b c
+  -> Protocol (StateT Sesh IO) b c
+  -> StateT Sesh IO Command
   -> IO ()
-alice port eval = PN.connect "localhost" port $ \(sock, _) -> do
+alice port eval knit = PN.connect "localhost" port $ \(sock, _) -> do
   let host = "alice"
+      sesh = open sock host
   blog host "session established"
 
-  let grp = Group p g
-  gen <- MWC.createSystemRandom
-  per@Keys {..} <- genpair grp gen
-  blog host "sending group parameters and public key"
-  runEffect $ do
-        PB.encode (Just (SendParams grp pub))
+  (cmd, nex) <- S.runStateT knit sesh
+
+  runEffect $
+        PB.encode (Just cmd)
     >-> PN.toSocket sock
 
-  let sesh = Sesh {
-          dhGroup = Just grp
-        , dhHost  = host
-        , dhKeys  = Just per
-        , dhKey   = Nothing
-        , dhGen   = pure gen
-        }
-  void $ S.runStateT (runEffect (session sock eval)) sesh
+  void $ S.runStateT (runEffect (session sock eval)) nex
 
--- await key exchange, initiate key exchange
+-- await key exchange
 mallory
   :: (DB.Binary b, DB.Binary c)
   => PN.ServiceName
   -> PN.ServiceName
-  -> Handler (StateT Sesh IO) b c
+  -> Protocol (StateT Sesh IO) b c
   -> IO ()
 mallory port bport eval = do
   let host = "mallory"
   PN.serve "localhost" port $ \(asock, _) -> do
+    let sesh = open asock host
     blog host  "LiSteNIng.."
     PN.connect "localhost" bport $ \(bsock, _) -> do
-      let sesh = Sesh {
-              dhGroup = Nothing
-            , dhHost  = host
-            , dhKeys  = Nothing
-            , dhKey   = Nothing
-            , dhGen   = MWC.createSystemRandom
-            }
-      blog host "eStabLisHed coNNecTion"
+      blog host "eStabLisHed MiTm coNNecTion"
       void $ S.runStateT (runEffect (dance asock bsock eval)) sesh
 
+-- initialize session with basic stuff
+open :: PN.Socket -> T.Text -> Sesh
+open sock host = Sesh {
+    dhGroup = Nothing
+  , dhHost  = host
+  , dhSock  = sock
+  , dhKeys  = Nothing
+  , dhKey   = Nothing
+  , dhGen   = MWC.createSystemRandom
+  }
+
+sendParams :: StateT Sesh IO Command
+sendParams = do
+  grp <- genGroup p g
+  Keys {..} <- genKeypair
+  slog "sending group parameters and public key"
+  pure (SendParams grp pub)
+
+sendGroup :: StateT Sesh IO Command
+sendGroup = do
+  grp <- genGroup p g
+  slog "sending group parameters"
+  pure (SendGroup grp)
