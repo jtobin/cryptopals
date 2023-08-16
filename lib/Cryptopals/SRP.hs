@@ -107,6 +107,14 @@ auth = do
   slog "sending authentication request"
   pure (Auth ei pub)
 
+authZero :: SRP IO Command
+authZero = do
+  Env {..} <- lift ask
+  sesh <- get
+  put sesh { sourpub = 0 }
+  slog "sending authentication request with a zero key"
+  pure (Auth ei 0)
+
 -- basic log
 blog :: T.Text -> T.Text -> IO ()
 blog host msg = do
@@ -240,6 +248,29 @@ srp cmd = do
     End -> do
       slog "ending session"
       liftIO SE.exitSuccess -- XX close the socket
+
+srpZero :: MonadIO m => PN.Protocol (SRP m) Command Command
+srpZero cmd = do
+  Env {..} <- lift ask
+  case cmd of
+    AckAuth salt herpub -> do
+      slog "received authentication request ack"
+      sesh@Sesh {..} <- get
+      put sesh {
+          ssalt   = Just salt
+        , sherpub = Just herpub
+        }
+      let k = CS.bytestringDigest
+            . CS.sha256
+            . DB.encode
+            $ (0 :: Natural)
+      let mac = BL.toStrict
+              . CS.bytestringDigest
+              $ CS.hmacSha256 k (BL.fromStrict salt)
+      slog $ "sending MAC " <> B64.encodeBase64 mac
+      pure (SendMAC mac)
+
+    _ -> srp cmd
 
 hashpubs :: Natural -> Natural -> Natural
 hashpubs a b =
