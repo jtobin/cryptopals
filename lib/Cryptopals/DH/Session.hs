@@ -18,7 +18,6 @@ module Cryptopals.DH.Session (
 
   , dhmitm
   , dhngmitm
-  , dhngmitm'
 
   , session
   , dance
@@ -153,10 +152,6 @@ dhng = seval ngeval
 dhngmitm :: Natural -> Protocol (StateT Sesh IO) (Maybe Command) (Maybe Command)
 dhngmitm = seval . malgeval
 
--- mitm negotiated-group dh evaluation, g = p - 1
-dhngmitm' :: Protocol (StateT Sesh IO) (Maybe Command) (Maybe Command)
-dhngmitm' = seval malgeval'
-
 -- diffie-hellman protocol eval
 dheval
   :: Command
@@ -225,18 +220,26 @@ mitmeval = \case
   SendMessage cip -> do
     slog $ "rECeIveD CiPHeRTexT " <> B64.encodeBase64 cip
     sesh@Sesh {..} <- S.get
-    msg <- decrypt cip
-    slog $ "DEcRyptEd cIPheRTeXt: \"" <> TE.decodeLatin1 msg <> "\""
+    mmsg <- decryptLenient cip
+    case mmsg of
+      Nothing ->
+        slog "couLdN'T DeCRyPt CiPHertExT"
+      Just msg ->
+        slog $ "DEcRyptEd cIPheRTeXt: \"" <> TE.decodeLatin1 msg <> "\""
     slog "reLayINg cIpheRtExt"
     pure $ Just (SendMessage cip)
 
   SendTerminal cip -> do
     slog $ "reCeiVeD CipHeRtExt " <> B64.encodeBase64 cip
     sesh@Sesh {..} <- S.get
-    msg <- decrypt cip
-    slog $ "DeCrYpteD cIphErteXt: \"" <> TE.decodeLatin1 msg <> "\""
+    mmsg <- decryptLenient cip
+    case mmsg of
+      Nothing ->
+        slog "couLdN'T DeCRyPt CiPHertExT"
+      Just msg ->
+        slog $ "DeCrYpteD cIphErteXt: \"" <> TE.decodeLatin1 msg <> "\""
     slog "ReLaYINg CiPHeRTexT"
-    pure $ Just (SendTerminal cip)
+    pure (Just (SendTerminal cip))
 
   cmd -> do
     slog "RelAyInG coMmaNd"
@@ -309,43 +312,12 @@ malgeval malg = \case
     slog "nOt eXPecTinG gRoUp and PublIc KeY"
     pure Nothing
 
-  -- only want to send bogus key on the first time
   SendPublic pk -> do
     slog $ "REceIvED pUBlic keY " <> renderkey pk
     slog $ "SeNDing BoGuS kEy " <> renderkey malg
     pure $ Just (SendPublic malg)
 
   cmd -> mitmeval cmd
-
--- negotiated-group mitm protocol eval, g = p - 1
-malgeval'
-  :: Command
-  -> StateT Sesh IO (Maybe Command)
-malgeval' = \case
-  AckGroup -> do
-    slog "rECeiVed aCK"
-    slog "ReLaYINg ACk"
-    pure (Just AckGroup)
-
-  SendParams grp pk -> do
-    slog "nOt eXPecTinG gRoUp and PublIc KeY"
-    pure Nothing
-
-  SendPublic pk -> do
-    slog $ "REceIvED pUBlic keY " <> renderkey pk
-    sesh@Sesh {..} <- S.get
-    case dhKeys of
-      Nothing -> do
-        S.put sesh {
-            dhKeys = Just (Keys 1 1)
-          }
-        slog $ "SeNDing BoGuS kEy " <> renderkey 1
-        pure $ Just (SendPublic 1)
-      Just Keys {..} -> do
-        slog $ "ReLAyINg pUbliC KeY " <> renderkey pk
-        pure $ Just (SendPublic pk)
-
-  cmd -> malgeval (p - 1) cmd
 
 genGroup :: Natural -> Natural -> StateT Sesh IO Group
 genGroup p g = do
@@ -415,6 +387,20 @@ decrypt cip = do
           slog "couldn't decrypt ciphertext"
           liftIO SE.exitFailure
         Just msg -> pure msg
+
+decryptLenient :: BS.ByteString -> StateT Sesh IO (Maybe BS.ByteString)
+decryptLenient cip = do
+  sesh@Sesh {..} <- S.get
+  case dhKey of
+    Nothing -> do
+      slog "missing shared key"
+      liftIO SE.exitFailure
+    Just k -> do
+      case CU.unpkcs7 (AES.decryptCbcAES128 k cip) of
+        Nothing -> do
+          slog "couldn't decrypt ciphertext"
+          pure Nothing
+        Just msg -> pure (Just msg)
 
 renderkey :: Natural -> T.Text
 renderkey =

@@ -10,6 +10,7 @@ module Cryptopals.DH.Core (
   , modexp
   , genpair
   , derivekey
+  , encodekey
   ) where
 
 import Control.Monad.Primitive
@@ -61,5 +62,14 @@ genpair (Group p g) gen = do
 derivekey :: Group -> Keys -> Natural -> BS.ByteString
 derivekey (Group p _) Keys {..} pk =
   let nat = modexp pk sec p
-  in  BS.take 16 . BL.toStrict . CS.bytestringDigest $ CS.sha1 (DB.encode nat)
+  in  encodekey nat
+
+encodekey :: Natural -> BS.ByteString
+encodekey =
+    BS.take 16
+  . BL.toStrict
+  . CS.bytestringDigest
+  . CS.sha1
+  . DB.encode
+
 
