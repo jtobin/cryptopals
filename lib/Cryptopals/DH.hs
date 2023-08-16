@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module Cryptopals.DH (
     p
   , g

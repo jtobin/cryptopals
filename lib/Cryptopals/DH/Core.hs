@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
-
 module Cryptopals.DH.Core (
     Group(..)
   , p

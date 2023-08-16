@@ -1,6 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE RecordWildCards #-}
-
 module Cryptopals.SRP where
 
 import Control.Concurrent (threadDelay)

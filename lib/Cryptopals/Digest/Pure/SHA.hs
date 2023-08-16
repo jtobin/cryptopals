@@ -2,7 +2,7 @@
 --
 -- https://hackage.haskell.org/package/SHA-1.6.4.4/docs/src/Data.Digest.Pure.SHA.html
 
-{-# LANGUAGE BangPatterns, CPP, FlexibleInstances #-}
+{-# LANGUAGE CPP, FlexibleInstances #-}
 -- |Pure implementations of the SHA suite of hash functions. The implementation
 -- is basically an unoptimized translation of FIPS 180-2 into Haskell. If you're
 -- looking for performance, you probably won't find it here.

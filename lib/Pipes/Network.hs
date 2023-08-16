@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-
 module Pipes.Network (
     N.Socket(..)
   , N.SockAddr(..)

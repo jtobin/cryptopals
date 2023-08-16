@@ -1,6 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE RankNTypes #-}
-
 module Cryptopals.DH.Session (
     Command(..)
   , genGroup
