@@ -6,9 +6,7 @@ module Cryptopals.DH.Session (
   , genGroup
   , genKeypair
 
-
   , Sesh(..)
-  , Protocol
 
   , blog
   , slog
@@ -18,9 +16,6 @@ module Cryptopals.DH.Session (
 
   , dhmitm
   , dhngmitm
-
-  , session
-  , dance
   ) where
 
 import Control.Concurrent (threadDelay)
@@ -65,8 +60,6 @@ data Command =
 
 instance DB.Binary Command
 
-type Protocol m b c = b -> m c
-
 -- session state
 data Sesh = Sesh {
     dhGroup       :: Maybe Group
@@ -92,37 +85,6 @@ slog msg = do
 suspense :: IO ()
 suspense = threadDelay 1000000
 
--- basic TCP coordination
-session
-  :: (MonadIO m, DB.Binary b, DB.Binary c)
-  => PN.Socket
-  -> Protocol m b c
-  -> Effect m (PB.DecodingError, Producer BS.ByteString m ())
-session sock eval =
-        deco
-    >-> P.mapM eval
-    >-> for cat PB.encode
-    >-> send
-  where
-    recv = PN.fromSocket sock 4096
-    deco = PP.parsed PB.decode recv
-    send = PN.toSocket sock
-
--- MITM TCP coordination
-dance
-  :: (MonadIO m, DB.Binary b, DB.Binary c)
-  => PN.Socket
-  -> PN.Socket
-  -> Protocol m b c
-  -> Effect m (PB.DecodingError, Producer BS.ByteString m ())
-dance asock bsock eval =
-        PP.parsed PB.decode recv
-    >-> P.mapM eval
-    >-> for cat PB.encode
-    >-> PN.foxtrot bsock asock
-  where
-    recv = PN.rhumba asock bsock 4096
-
 -- generic session evaluator
 seval
   :: (Command -> StateT Sesh IO a)
@@ -137,19 +99,21 @@ seval cont = \case
     cont cmd
 
 -- basic dh evaluation
-dh :: Protocol (StateT Sesh IO) (Maybe Command) (Maybe Command)
+dh :: PN.Protocol (StateT Sesh IO) (Maybe Command) (Maybe Command)
 dh = seval dheval
 
 -- mitm dh evaluation
-dhmitm :: Protocol (StateT Sesh IO) (Maybe Command) (Maybe Command)
+dhmitm :: PN.Protocol (StateT Sesh IO) (Maybe Command) (Maybe Command)
 dhmitm = seval mitmeval
 
 -- negotiated-group dh evaluation
-dhng :: Protocol (StateT Sesh IO) (Maybe Command) (Maybe Command)
+dhng :: PN.Protocol (StateT Sesh IO) (Maybe Command) (Maybe Command)
 dhng = seval ngeval
 
 -- mitm negotiated-group dh evaluation
-dhngmitm :: Natural -> Protocol (StateT Sesh IO) (Maybe Command) (Maybe Command)
+dhngmitm
+  :: Natural
+  -> PN.Protocol (StateT Sesh IO) (Maybe Command) (Maybe Command)
 dhngmitm = seval . malgeval
 
 -- diffie-hellman protocol eval

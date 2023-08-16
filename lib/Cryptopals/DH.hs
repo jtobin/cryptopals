@@ -4,6 +4,7 @@ module Cryptopals.DH (
     p
   , g
   , modexp
+  , encodekey
   ) where
 
 import Control.Monad.Primitive
@@ -25,19 +26,19 @@ import qualified System.Random.MWC as MWC
 bob
   :: (DB.Binary b, DB.Binary c)
   => PN.ServiceName
-  -> Protocol (StateT Sesh IO) b c
+  -> PN.Protocol (StateT Sesh IO) b c
   -> IO ()
 bob port eval = PN.serve "localhost" port $ \(sock, _) -> do
   let host = "bob"
       sesh = open sock host
   blog host "listening.."
-  void $ S.evalStateT (runEffect (session sock eval)) sesh
+  void $ S.evalStateT (runEffect (PN.session sock eval)) sesh
 
 -- initiate key exchange
 alice
   :: (DB.Binary b, DB.Binary c)
   => PN.ServiceName
-  -> Protocol (StateT Sesh IO) b c
+  -> PN.Protocol (StateT Sesh IO) b c
   -> StateT Sesh IO Command
   -> IO ()
 alice port eval knit = PN.connect "localhost" port $ \(sock, _) -> do
@@ -51,14 +52,14 @@ alice port eval knit = PN.connect "localhost" port $ \(sock, _) -> do
         PB.encode (Just cmd)
     >-> PN.toSocket sock
 
-  void $ S.runStateT (runEffect (session sock eval)) nex
+  void $ S.runStateT (runEffect (PN.session sock eval)) nex
 
 -- await key exchange
 mallory
   :: (DB.Binary b, DB.Binary c)
   => PN.ServiceName
   -> PN.ServiceName
-  -> Protocol (StateT Sesh IO) b c
+  -> PN.Protocol (StateT Sesh IO) b c
   -> IO ()
 mallory port bport eval = do
   let host = "mallory"
@@ -67,7 +68,7 @@ mallory port bport eval = do
     blog host  "LiSteNIng.."
     PN.connect "localhost" bport $ \(bsock, _) -> do
       blog host "eStabLisHed MiTm coNNecTion"
-      void $ S.runStateT (runEffect (dance asock bsock eval)) sesh
+      void $ S.runStateT (runEffect (PN.dance asock bsock eval)) sesh
 
 -- initialize session with basic stuff
 open :: PN.Socket -> T.Text -> Sesh

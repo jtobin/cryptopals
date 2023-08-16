@@ -30,6 +30,7 @@ library
     , Cryptopals.Digest.Pure.SHA
     , Cryptopals.MAC
     , Cryptopals.MAC.Attacks
+    , Cryptopals.SRP
     , Cryptopals.Stream.Attacks
     , Cryptopals.Stream.RNG
     , Cryptopals.Stream.RNG.MT19937

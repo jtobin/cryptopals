@@ -8,6 +8,7 @@ module Cryptopals.DH.Core (
   , Keys(..)
 
   , modexp
+
   , genpair
   , derivekey
   , encodekey
@@ -71,5 +72,4 @@ encodekey =
   . CS.bytestringDigest
   . CS.sha1
   . DB.encode
-
 
