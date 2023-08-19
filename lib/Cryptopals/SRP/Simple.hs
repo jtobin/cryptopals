@@ -15,7 +15,6 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as BL8
-import qualified Data.HashMap.Lazy as HML
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.Text.IO as TIO
@@ -350,26 +349,11 @@ mitm cmd = do
         Nothing -> do
           slog "missing required parameters"
           pure End
-        Just herpub -> do
-          slog $ "USiNg PaRaMeTeRs " <> (T.pack . show) herpub
+        Just (T.pack . show -> herpub) -> do
+          slog $ "USiNg PaRaMeTeRs " <> herpub
               <> " aNd " <> B16.encodeBase16 mac
           slog "GoINg ofFLinE.."
           pure End
 
     _ -> srpsimple cmd
-
-populate
-  :: MonadIO m
-  => Natural
-  -> ReaderT Env m (HML.HashMap BL.ByteString BL.ByteString)
-populate herpub = do
-  Env {..} <- ask
-  dict <- liftIO $ BL8.readFile "/usr/share/dict/words"
-  let ls = BL8.lines dict
-      ns = fmap (fromIntegral . CS.integerDigest . CS.sha256) ls :: [Natural]
-      ss = fmap (\x -> herpub * DH.modexp eg x en) ns
-      hs = fmap (CS.bytestringDigest . CS.sha256 . DB.encode) ss
-      ms = fmap (\s -> CS.bytestringDigest (CS.hmacSha256 s mempty)) hs
-
-  pure . HML.fromList $ zip ms ls
 

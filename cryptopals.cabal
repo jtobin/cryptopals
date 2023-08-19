@@ -32,6 +32,7 @@ library
     , Cryptopals.Digest.Pure.SHA
     , Cryptopals.MAC
     , Cryptopals.MAC.Attacks
+    , Cryptopals.RSA
     , Cryptopals.SRP
     , Cryptopals.SRP.Simple
     , Cryptopals.Stream.Attacks
