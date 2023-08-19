@@ -1,9 +1,12 @@
 module Cryptopals.RSA (
-    invmod
+    Key(..)
+  , Keypair(..)
+  , keygen
+
   , unroll
   , roll
 
-  , keygen
+  , invmod
   , encrypt
   , decrypt
   ) where
@@ -14,6 +17,8 @@ import qualified Data.Binary as DB
 import qualified Data.Bits as B
 import qualified Data.ByteString as BS
 import Data.List (unfoldr)
+import qualified Data.Maybe as M
+import qualified Math.NumberTheory.Roots as R
 import Numeric.Natural
 
 -- | Simple little-endian ByteString encoding for Naturals.
@@ -70,11 +75,11 @@ keygen siz = loop where
         md  = invmod e et
     case md of
       Nothing -> loop
-      Just d  -> pure $ Keypair (Key e n) (Key d n)
+      Just d  -> pure $ Keypair (Key d n) (Key e n)
 
 encrypt :: Key -> BS.ByteString -> BS.ByteString
 encrypt (Key e n) m = unroll (DH.modexp (roll m) e n)
 
 decrypt :: Key -> BS.ByteString -> BS.ByteString
-decrypt (Key d n) c = unroll (DH.modexp (roll c) d n)
+decrypt = encrypt
 

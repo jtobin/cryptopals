@@ -51,6 +51,7 @@ library
     , containers
     , cryptonite
     , HTTP
+    , integer-roots
     , mwc-random
     , network
     , network-simple
