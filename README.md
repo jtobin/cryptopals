@@ -13,4 +13,5 @@ to build binaries. Use `cabal install` to (I think) dump them in
 * [Problem Set 3](docs/s3.md)
 * [Problem Set 4](docs/s4.md)
 * [Problem Set 5](docs/s5.md)
+* [Problem Set 6](docs/s6.md)
 

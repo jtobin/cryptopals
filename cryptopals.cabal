@@ -33,6 +33,7 @@ library
     , Cryptopals.MAC
     , Cryptopals.MAC.Attacks
     , Cryptopals.RSA
+    , Cryptopals.RSA.Attacks
     , Cryptopals.SRP
     , Cryptopals.SRP.Simple
     , Cryptopals.Stream.Attacks

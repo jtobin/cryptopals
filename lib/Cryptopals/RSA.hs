@@ -7,6 +7,7 @@ module Cryptopals.RSA (
   , roll
 
   , invmod
+  , invmod'
   , encrypt
   , decrypt
   ) where
@@ -17,8 +18,6 @@ import qualified Data.Binary as DB
 import qualified Data.Bits as B
 import qualified Data.ByteString as BS
 import Data.List (unfoldr)
-import qualified Data.Maybe as M
-import qualified Math.NumberTheory.Roots as R
 import Numeric.Natural
 
 -- | Simple little-endian ByteString encoding for Naturals.
@@ -41,14 +40,14 @@ roll = foldr unstep 0 . BS.unpack where
 egcd :: Integer -> Integer -> (Integer, Integer, Integer)
 egcd a 0 = (1, 0, a)
 egcd a b =
-  let (q, r) = a `quotRem` b
+  let (q, r)    = a `quotRem` b
       (s, t, g) = egcd b r
-  in (t, s - q * t, g)
+  in  (t, s - q * t, g)
 
 -- for a, m return x such that ax = 1 mod m
 invmod :: Natural -> Natural -> Maybe Natural
 invmod (fromIntegral -> a) (fromIntegral -> m)
-    | 1 == g    = Just (pos i)
+    | g == 1    = Just (pos i)
     | otherwise = Nothing
   where
     (i, _, g) = egcd a m
@@ -56,7 +55,14 @@ invmod (fromIntegral -> a) (fromIntegral -> m)
       | x < 0     = fromIntegral (x + m)
       | otherwise = fromIntegral x
 
-data Key = Key Natural Natural
+invmod' :: Natural -> Natural -> Natural
+invmod' a m = case invmod a m of
+  Just x  -> x
+  Nothing -> error "invmod': no modular inverse"
+
+data Key =
+    Sec Natural Natural
+  | Pub Natural Natural
   deriving (Eq, Show)
 
 data Keypair = Keypair {
@@ -75,11 +81,15 @@ keygen siz = loop where
         md  = invmod e et
     case md of
       Nothing -> loop
-      Just d  -> pure $ Keypair (Key d n) (Key e n)
+      Just d  -> pure $ Keypair (Sec d n) (Pub e n)
 
 encrypt :: Key -> BS.ByteString -> BS.ByteString
-encrypt (Key e n) m = unroll (DH.modexp (roll m) e n)
+encrypt key msg = case key of
+  Sec {}  -> error "encrypt: need public key"
+  Pub e n -> unroll (DH.modexp (roll msg) e n)
 
 decrypt :: Key -> BS.ByteString -> BS.ByteString
-decrypt = encrypt
+decrypt key cip = case key of
+  Pub {}  -> error "decrypt: need secret key"
+  Sec d n -> unroll (DH.modexp (roll cip) d n)
 
