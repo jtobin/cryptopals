@@ -3,8 +3,12 @@ module Cryptopals.RSA (
   , Keypair(..)
   , keygen
 
+  , bitl
+
   , unroll
   , roll
+  , unroll'
+  , roll'
 
   , invmod
   , invmod'
@@ -14,11 +18,11 @@ module Cryptopals.RSA (
 
   , pkcs1v1p5encode
   , pkcs1v1p5verify
+  , asnSha512
+  , asnSha1
 
   , sign
   , verify
-  , sign'
-  , verify'
   ) where
 
 import qualified Cryptopals.DH as DH
@@ -28,21 +32,41 @@ import qualified Data.Binary as DB
 import qualified Data.Bits as B
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
-import Data.List (unfoldr)
+import qualified Math.NumberTheory.Logarithms as L
 import Numeric.Natural
 
--- | Simple little-endian ByteString encoding for Naturals.
+-- bit length
+bitl :: Natural -> Int
+bitl (fromIntegral -> n)
+  | n > 0     = succ . L.integerLog2' $ n
+  | otherwise = 0
+
+-- big-endian natural encoding
 unroll :: Natural -> BS.ByteString
 unroll nat = case nat of
     0 -> BS.singleton 0
-    _ -> BS.pack (unfoldr step nat)
+    _ -> BS.reverse $ BS.unfoldr step nat
   where
     step 0 = Nothing
     step i = Just (fromIntegral i, i `B.shiftR` 8)
 
--- | Simple little-endian ByteString decoding for Naturals.
+-- big-endian bytestring decoding
 roll :: BS.ByteString -> Natural
-roll = foldr unstep 0 . BS.unpack where
+roll = BS.foldl' unstep 0 where
+  unstep a b = a `B.shiftL` 8 B..|. fromIntegral b
+
+-- little-endian natural encoding
+unroll' :: Natural -> BS.ByteString
+unroll' nat = case nat of
+    0 -> BS.singleton 0
+    _ -> BS.unfoldr step nat
+  where
+    step 0 = Nothing
+    step i = Just (fromIntegral i, i `B.shiftR` 8)
+
+-- little-endian bytestring decoding
+roll' :: BS.ByteString -> Natural
+roll' = BS.foldr unstep 0 where
   unstep b a = a `B.shiftL` 8 B..|. fromIntegral b
 
 -- egcd/invmod adapted from https://rosettacode.org/wiki/Modular_inverse
@@ -95,6 +119,8 @@ keygen siz = loop where
       Nothing -> loop
       Just d  -> pure $ Keypair (Sec d n) (Pub e n)
 
+-- XX padding for crypt ops / other hash functions for signatures
+
 encrypt :: Key -> BS.ByteString -> BS.ByteString
 encrypt key msg = case key of
   Sec {}  -> error "encrypt: need public key"
@@ -105,22 +131,7 @@ decrypt key cip = case key of
   Pub {}  -> error "decrypt: need secret key"
   Sec d n -> unroll (DH.modexp (roll cip) d n)
 
--- sign without padding
-sign' :: Key -> BS.ByteString -> (BS.ByteString, BS.ByteString)
-sign' key msg = case key of
-  Pub {}  -> error "sign': need secret key"
-  Sec d n ->
-    let h = fromIntegral $ CS.integerDigest (CS.sha512 (BL.fromStrict msg))
-    in  (msg, unroll (DH.modexp h d n))
-
--- verify without padding
-verify' :: Key -> BS.ByteString -> BS.ByteString -> Bool
-verify' key msg sig = case key of
-  Sec {}  -> error "verify': need public key"
-  Pub e n ->
-    let h = fromIntegral $ CS.integerDigest (CS.sha512 (BL.fromStrict msg))
-    in  h == DH.modexp (roll sig) e n
-
+-- sign using SHA512
 sign :: Key -> BS.ByteString -> (BS.ByteString, BS.ByteString)
 sign key msg = case key of
   Pub {}  -> error "sign: need secret key"
@@ -128,17 +139,18 @@ sign key msg = case key of
     let padded = pkcs1v1p5encode key msg
     in  (msg, unroll (DH.modexp (roll padded) d n))
 
+-- verify using broken pkcs1 (SHA512) verification
 verify :: Key -> BS.ByteString -> BS.ByteString -> Bool
 verify key msg sig = case key of
   Sec {}  -> error "verify: need public key"
   Pub e n ->
     let h = BL.toStrict $ CS.bytestringDigest (CS.sha512 (BL.fromStrict msg))
         r = DH.modexp (roll sig) e n
-    in  case pkcs1v1p5verify (unroll r) of
+    in  case pkcs1v1p5verify (BS.cons 0 (unroll r)) of -- BE-storage hack
           Nothing -> False
           Just l  -> h == l
 
--- pkcs#1 v1.5-encode a message
+-- pkcs#1 v1.5-encode a message (using SHA512)
 pkcs1v1p5encode :: Key -> BS.ByteString -> BS.ByteString
 pkcs1v1p5encode key msg =
     BS.cons 0x00 (BS.snoc (BS.cons 0x01 ffs) 0x00) <> asnSha512 <> has
@@ -150,8 +162,8 @@ pkcs1v1p5encode key msg =
     ffs = BS.replicate len 0xff
     has = BL.toStrict $ CS.bytestringDigest (CS.sha512 (BL.fromStrict msg))
 
--- sloppy pkcs#1 v1.5 verification; doesn't check message terminates
--- after hash
+-- sloppy pkcs#1 v1.5 verification (SHA512); doesn't verify the length
+-- of the padding
 pkcs1v1p5verify :: BS.ByteString -> Maybe BS.ByteString
 pkcs1v1p5verify = checknul where
   checknul bs = case BS.uncons bs of
@@ -195,3 +207,9 @@ asnSha512 = BS.pack [
   , 0x40
   ]
 
+-- ASN.1 encoding of SHA1
+asnSha1 :: BS.ByteString
+asnSha1 = BS.pack [
+    0x30, 0x21, 0x30, 0x09, 0x06, 0x05, 0x2b, 0x0e, 0x03
+  , 0x02, 0x1a, 0x05, 0x00, 0x04, 0x14
+  ]

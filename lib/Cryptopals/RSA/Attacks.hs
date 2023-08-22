@@ -25,6 +25,8 @@ import Pipes
 import qualified Pipes.Prelude as P
 import qualified System.Random.MWC as MWC
 
+-- e=3 broadcast attack
+
 e3BroadcastAttack
   :: (BS.ByteString, Key)   -- ciphertext / pubkey
   -> (BS.ByteString, Key)   -- ciphertext / pubkey
@@ -45,6 +47,8 @@ e3BroadcastAttack (c0, p0) (c1, p1) (c2, p2) = case (p0, p1, p2) of
     in  unroll (R.integerCubeRoot c)
 
   _ -> error "e3BroadcastAttack: require public keys"
+
+-- unpadded message recovery oracle
 
 type Digests = HS.HashSet Integer
 
@@ -103,4 +107,23 @@ umrrecover
 umrrecover key s msg = case key of
   Sec {}  -> error "umrrecover: need public key"
   Pub e n -> unroll $ (roll msg `mod` n * invmod' s n) `mod` n
+
+-- bleichenbacher's e=3 signature forgery
+
+fencode :: Natural -> BS.ByteString -> BS.ByteString
+fencode mod msg =
+  let has = BL.toStrict $ CS.bytestringDigest (CS.sha512 (BL.fromStrict msg))
+      len = bitl mod `quot` 8
+      pad =
+          BS.cons 0x00
+        . BS.cons 0x01
+        . BS.cons 0xff
+        $ BS.cons 0x00 asnSha512
+      vil = pad <> has
+  in  vil <> BS.replicate (len - BS.length vil) 0
+
+forge :: Natural -> BS.ByteString -> BS.ByteString
+forge mod msg =
+  let f = fencode mod msg
+  in  unroll $ R.integerCubeRoot (roll f) + 1
 

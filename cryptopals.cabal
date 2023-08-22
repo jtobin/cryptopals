@@ -52,6 +52,7 @@ library
     , containers
     , cryptonite
     , HTTP
+    , integer-logarithms
     , integer-roots
     , mwc-random
     , network
