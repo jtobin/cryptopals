@@ -8,6 +8,7 @@ module Cryptopals.DSA (
 
   , Sig(..)
   , sign
+  , sign'
   , verify
   ) where
 
@@ -82,6 +83,26 @@ sign ps@Params {..} key msg gen = case key of
       if   s == 0
       then sign ps key msg gen
       else pure (Sig r s)
+
+-- sign with provided subkey/nonce
+sign'
+  :: Params
+  -> Key
+  -> Natural
+  -> BS.ByteString
+  -> Sig
+sign' ps@Params {..} key k msg = case key of
+  Pub {} -> error "sign: need secret key"
+  Sec x  ->
+    let r = DH.modexp dsag k p `rem` dsaq
+    in  if   r == 0
+        then error "sign': invalid nonce (r)"
+        else
+          let h = fi . CS.integerDigest . CS.sha1 $ BL.fromStrict msg
+              s = (RSA.modinv' k dsaq * (h + x * r)) `rem` dsaq
+          in  if   s == 0
+              then error "sign': invalid nonce (s)"
+              else Sig r s
 
 verify
   :: Params
