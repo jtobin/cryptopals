@@ -1,4 +1,7 @@
-module Cryptopals.DSA.Attacks where
+module Cryptopals.DSA.Attacks (
+    fromsub
+  , recoverNonce
+  ) where
 
 import qualified Control.Monad.ST as ST
 import qualified Cryptopals.DH as DH
@@ -186,3 +189,24 @@ sig6 = Sig r6 s6
 h6 :: Natural
 h6 = 0xd6340bfcda59b6b75b59ca634813d572de800e8f
 
+-- parameter tampering --------------------------------------------------------
+
+badParams :: Params
+badParams = defaultParams {
+    dsag = 0
+  }
+
+otherBadParams :: Params
+otherBadParams = defaultParams {
+      dsag = dsap + 1
+    }
+  where
+    Params {..} = defaultParams
+
+magicsig :: Params -> Key -> Sig
+magicsig Params {..} key = case key of
+  Sec {} -> error "magicsig: need public key"
+  Pub pk ->
+    let r = (DH.modexp pk 3 dsap) `mod` dsaq
+        s = (r * RSA.modinv' 3 dsaq) `mod` dsaq
+    in  Sig r s

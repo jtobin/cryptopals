@@ -10,6 +10,9 @@ module Cryptopals.DSA (
   , sign
   , sign'
   , verify
+
+  , unsafeSign
+  , unsafeVerify
   ) where
 
 import Control.Monad.Primitive
@@ -104,6 +107,23 @@ sign' ps@Params {..} key k msg = case key of
               then error "sign': invalid nonce (s)"
               else Sig r s
 
+-- don't check for bad signature values
+unsafeSign
+  :: PrimMonad m
+  => Params
+  -> Key
+  -> BS.ByteString
+  -> MWC.Gen (PrimState m)
+  -> m Sig
+unsafeSign ps@Params {..} key msg gen = case key of
+  Pub {} -> error "sign: need secret key"
+  Sec x  -> do
+    k <- MWC.uniformRM (1, dsaq - 1) gen
+    let r = DH.modexp dsag k p `rem` dsaq
+        h = fi . CS.integerDigest . CS.sha1 $ BL.fromStrict msg
+        s = (RSA.modinv' k dsaq * (h + x * r)) `rem` dsaq
+    pure (Sig r s)
+
 verify
   :: Params
   -> Key
@@ -122,4 +142,22 @@ verify Params {..} key msg Sig {..} = case key of
             v  = (((DH.modexp dsag u1 dsap) * (DH.modexp y u2 dsap)) `rem` dsap)
                    `rem` dsaq
         in  v == sigr
+
+-- don't check for bad signature parameters
+unsafeVerify
+  :: Params
+  -> Key
+  -> BS.ByteString
+  -> Sig
+  -> Bool
+unsafeVerify Params {..} key msg Sig {..} = case key of
+  Sec {} -> error "verify: need public key"
+  Pub y  ->
+    let w  = RSA.modinv' sigs dsaq
+        h  = fi . CS.integerDigest . CS.sha1 $ BL.fromStrict msg
+        u1 = (h * w) `rem` dsaq
+        u2 = (sigr * w) `rem` dsaq
+        v  = (((DH.modexp dsag u1 dsap) * (DH.modexp y u2 dsap)) `rem` dsap)
+               `rem` dsaq
+    in  v == sigr
 
