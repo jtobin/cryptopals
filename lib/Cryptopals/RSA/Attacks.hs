@@ -38,9 +38,9 @@ e3BroadcastAttack (c0, p0) (c1, p1) (c2, p2) = case (p0, p1, p2) of
         ms1 = n0 * n2
         ms2 = n0 * n1
 
-        s   = roll c0 * ms0 * invmod' ms0 n0
-            + roll c1 * ms1 * invmod' ms1 n1
-            + roll c2 * ms2 * invmod' ms2 n2
+        s   = roll c0 * ms0 * modinv' ms0 n0
+            + roll c1 * ms1 * modinv' ms1 n1
+            + roll c2 * ms2 * modinv' ms2 n2
 
         c   = s `mod` (n0 * n1 * n2)
 
@@ -106,7 +106,7 @@ umrrecover
   -> BS.ByteString
 umrrecover key s msg = case key of
   Sec {}  -> error "umrrecover: need public key"
-  Pub e n -> unroll $ (roll msg `mod` n * invmod' s n) `mod` n
+  Pub e n -> unroll $ (roll msg `mod` n * modinv' s n) `mod` n
 
 -- bleichenbacher's e=3 signature forgery
 

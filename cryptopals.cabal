@@ -30,6 +30,8 @@ library
     , Cryptopals.DH.Session
     , Cryptopals.Digest.Pure.MD4
     , Cryptopals.Digest.Pure.SHA
+    , Cryptopals.DSA
+    , Cryptopals.DSA.Attacks
     , Cryptopals.MAC
     , Cryptopals.MAC.Attacks
     , Cryptopals.RSA

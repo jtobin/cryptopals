@@ -10,8 +10,8 @@ module Cryptopals.RSA (
   , unroll'
   , roll'
 
-  , invmod
-  , invmod'
+  , modinv
+  , modinv'
 
   , encrypt
   , decrypt
@@ -25,9 +25,9 @@ module Cryptopals.RSA (
   , verify
   ) where
 
+import qualified Crypto.Number.Prime as P
 import qualified Cryptopals.DH as DH
 import qualified Cryptopals.Digest.Pure.SHA as CS
-import qualified Crypto.Number.Prime as P
 import qualified Data.Binary as DB
 import qualified Data.Bits as B
 import qualified Data.ByteString as BS
@@ -69,7 +69,7 @@ roll' :: BS.ByteString -> Natural
 roll' = BS.foldr unstep 0 where
   unstep b a = a `B.shiftL` 8 B..|. fromIntegral b
 
--- egcd/invmod adapted from https://rosettacode.org/wiki/Modular_inverse
+-- egcd/modinv adapted from https://rosettacode.org/wiki/Modular_inverse
 
 -- for a, b, return x, y, g such that ax + by = g for g = gcd(a, b)
 egcd :: Integer -> Integer -> (Integer, Integer, Integer)
@@ -80,8 +80,8 @@ egcd a b =
   in  (t, s - q * t, g)
 
 -- for a, m return x such that ax = 1 mod m
-invmod :: Natural -> Natural -> Maybe Natural
-invmod (fromIntegral -> a) (fromIntegral -> m)
+modinv :: Natural -> Natural -> Maybe Natural
+modinv (fromIntegral -> a) (fromIntegral -> m)
     | g == 1    = Just (pos i)
     | otherwise = Nothing
   where
@@ -90,11 +90,11 @@ invmod (fromIntegral -> a) (fromIntegral -> m)
       | x < 0     = fromIntegral (x + m)
       | otherwise = fromIntegral x
 
--- unsafe invmod
-invmod' :: Natural -> Natural -> Natural
-invmod' a m = case invmod a m of
+-- unsafe modinv
+modinv' :: Natural -> Natural -> Natural
+modinv' a m = case modinv a m of
   Just x  -> x
-  Nothing -> error "invmod': no modular inverse"
+  Nothing -> error "modinv': no modular inverse"
 
 data Key =
     Sec Natural Natural
@@ -114,7 +114,7 @@ keygen siz = loop where
     let n   = p * q
         et  = pred p * pred q
         e   = 3
-        md  = invmod e et
+        md  = modinv e et
     case md of
       Nothing -> loop
       Just d  -> pure $ Keypair (Sec d n) (Pub e n)
